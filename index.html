@@ -1,0 +1,1643 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monitor de Entorno — CGR</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#f5f4f0; --surface:#fff; --s2:#f0ede8; --border:#ddd9d2;
+  --text:#1a1917; --t2:#5c5954; --t3:#9e9a94;
+  --azul:#384A99; --azulD:#25336C; --naranja:#E57B3C;
+  --gbg:#e6f4ea; --gtx:#2a6b3a;
+  --rbg:#fbeaea; --rtx:#8a1a1a;
+  --abg:#fdf3e0; --atx:#7a4e0a;
+  --bbg:#e8f1fb; --btx:#1a4f8a;
+  --r:6px; --rl:10px;
+  --mono:'IBM Plex Mono',monospace;
+  --sans:'IBM Plex Sans',sans-serif;
+}
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:var(--sans); background:var(--bg); color:var(--text); min-height:100vh; font-size:14px; line-height:1.6; }
+
+/* ── LAYOUT ── */
+.layout { display:grid; grid-template-columns:270px 1fr; min-height:100vh; }
+
+/* ── SIDEBAR ── */
+.sidebar {
+  background:var(--azulD); color:#f5f4f0;
+  padding:16px 14px; display:flex; flex-direction:column; gap:12px;
+  position:sticky; top:0; height:100vh;
+  overflow-y:auto; overflow-x:hidden;
+  scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.15) transparent;
+}
+.sidebar::-webkit-scrollbar { width:3px; }
+.sidebar::-webkit-scrollbar-thumb { background:rgba(255,255,255,.2); border-radius:99px; }
+
+.s-brand .inst { font-family:var(--mono); font-size:9px; letter-spacing:.12em; color:rgba(255,255,255,.35); text-transform:uppercase; display:block; }
+.s-brand h1 { font-size:13px; font-weight:500; color:#fff; line-height:1.35; margin-top:3px; }
+.s-brand .ver { font-family:var(--mono); font-size:9px; color:rgba(255,255,255,.25); margin-top:3px; display:block; }
+.s-sep { height:1px; background:rgba(255,255,255,.1); flex-shrink:0; }
+
+.s-label {
+  font-family:var(--mono); font-size:9px; letter-spacing:.12em;
+  color:rgba(255,255,255,.35); text-transform:uppercase;
+  margin-bottom:6px; display:flex; align-items:center; justify-content:space-between;
+}
+.s-label button {
+  font-size:10px; background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.15); border-radius:4px;
+  color:rgba(255,255,255,.6); cursor:pointer; padding:2px 7px;
+  font-family:var(--sans); line-height:1.4;
+}
+.s-label button:hover { background:rgba(255,255,255,.2); }
+
+/* RSS chips */
+.rss-wrap { display:flex; flex-wrap:wrap; gap:3px; }
+.rss-chip { font-size:9px; padding:2px 6px; border-radius:99px; background:rgba(42,122,64,.3); color:rgba(255,255,255,.65); border:1px solid rgba(42,122,64,.4); }
+
+/* KW grupos */
+.kw-group { margin-bottom:10px; }
+.kw-group-title { display:flex; align-items:center; justify-content:space-between; margin-bottom:5px; }
+.kw-group-name { font-size:11px; font-weight:500; color:rgba(255,255,255,.75); display:flex; align-items:center; gap:5px; }
+.dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+.d-azul { background:#28A9E0; }
+.d-naranja { background:#E57B3C; }
+.d-verde { background:#2A7A40; }
+.kw-count { font-family:var(--mono); font-size:9px; color:rgba(255,255,255,.3); }
+
+.kw-list { display:flex; flex-direction:column; gap:3px; margin-bottom:5px; }
+.kw-item {
+  display:flex; align-items:center; gap:5px;
+  background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1);
+  border-radius:4px; padding:5px 8px;
+}
+.kw-item:hover { background:rgba(255,255,255,.1); }
+.kw-text { font-size:11px; color:rgba(255,255,255,.75); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
+.kw-text:hover { color:#fff; }
+.kw-edit-wrap { display:flex; align-items:center; gap:4px; flex:1; }
+.kw-edit-input { font-size:11px; background:transparent; border:none; color:#fff; flex:1; outline:none; font-family:var(--sans); min-width:0; }
+.kw-actions { display:flex; gap:2px; flex-shrink:0; }
+.kw-btn { background:none; border:none; cursor:pointer; font-size:13px; color:rgba(255,255,255,.3); padding:0 2px; line-height:1; }
+.kw-btn:hover { color:rgba(255,80,80,.85); }
+.kw-btn.edit:hover { color:rgba(255,220,100,.85); }
+.kw-btn.ok:hover { color:rgba(100,220,100,.85); }
+
+.kw-add-row { display:flex; gap:4px; }
+.kw-add-input {
+  flex:1; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15);
+  border-radius:4px; color:#fff; font-size:11px; padding:5px 8px;
+  outline:none; font-family:var(--sans); min-width:0;
+}
+.kw-add-input::placeholder { color:rgba(255,255,255,.25); }
+.kw-add-input:focus { border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.12); }
+.kw-add-btn {
+  background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.2);
+  border-radius:4px; color:#fff; font-size:18px; width:30px;
+  cursor:pointer; flex-shrink:0; line-height:1; display:flex; align-items:center; justify-content:center;
+}
+.kw-add-btn:hover { background:rgba(255,255,255,.25); }
+
+.kw-summary { background:rgba(0,0,0,.2); border-radius:4px; padding:7px 9px; margin-top:6px; }
+.kw-summary-label { font-size:9px; color:rgba(255,255,255,.35); margin-bottom:1px; }
+.kw-summary-count { font-family:var(--mono); font-size:11px; color:rgba(255,255,255,.65); font-weight:500; }
+
+/* API */
+.api-section { margin-top:auto; padding-top:10px; border-top:1px solid rgba(255,255,255,.1); }
+.api-label { font-family:var(--mono); font-size:9px; letter-spacing:.1em; color:rgba(255,255,255,.3); text-transform:uppercase; margin-bottom:4px; }
+.api-input {
+  width:100%; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15);
+  border-radius:var(--r); color:#fff; font-family:var(--mono); font-size:10px;
+  padding:6px 8px; outline:none; letter-spacing:.04em;
+}
+.api-input:focus { border-color:rgba(255,255,255,.4); }
+.api-input::placeholder { color:rgba(255,255,255,.2); letter-spacing:0; }
+.api-note { font-size:10px; color:rgba(255,255,255,.22); margin-top:4px; line-height:1.5; }
+.api-note a { color:rgba(255,255,255,.45); }
+
+/* ── MAIN ── */
+.main { display:flex; flex-direction:column; min-height:100vh; }
+.accent-bar { height:3px; background:var(--naranja); flex-shrink:0; }
+.topbar {
+  background:var(--surface); border-bottom:1px solid var(--border);
+  padding:12px 24px; display:flex; align-items:center; justify-content:space-between;
+  position:sticky; top:0; z-index:10;
+}
+.topbar-left h2 { font-size:13px; font-weight:500; }
+.topbar-left p { font-family:var(--mono); font-size:10px; color:var(--t3); margin-top:1px; }
+.topbar-right { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.rss-badge {
+  font-size:10px; padding:2px 8px; border-radius:99px;
+  background:var(--gbg); color:var(--gtx); font-family:var(--mono);
+  display:none; border:1px solid #c0e0c8;
+}
+.status-badge {
+  font-family:var(--mono); font-size:10px; padding:2px 10px;
+  border-radius:99px; border:1px solid var(--border); color:var(--t3);
+}
+.status-badge.run { background:var(--bbg); color:var(--btx); border-color:transparent; }
+.status-badge.done { background:var(--gbg); color:var(--gtx); border-color:transparent; }
+.status-badge.err { background:var(--rbg); color:var(--rtx); border-color:transparent; }
+.run-btn {
+  background:var(--azulD); color:#fff; border:none; border-radius:var(--r);
+  font-family:var(--sans); font-size:13px; font-weight:500; padding:7px 16px;
+  cursor:pointer; display:flex; align-items:center; gap:6px; flex-shrink:0;
+}
+.run-btn:hover { opacity:.85; }
+.run-btn:disabled { opacity:.4; cursor:not-allowed; }
+
+/* ── CONTENT ── */
+.content { padding:20px 22px; flex:1; }
+.err-box {
+  display:none; background:var(--rbg); border:1px solid #f0c0c0;
+  border-radius:var(--r); padding:12px 14px; font-size:13px;
+  color:var(--rtx); margin-bottom:12px;
+}
+.err-box strong { font-weight:600; display:block; margin-bottom:2px; }
+
+/* Panel colapsable */
+.panel {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--rl); margin-bottom:12px; overflow:hidden;
+}
+.panel-head {
+  padding:10px 14px; display:flex; align-items:center; justify-content:space-between;
+  cursor:pointer; user-select:none;
+}
+.panel-head:hover { background:var(--s2); }
+.panel-head-left { display:flex; align-items:center; gap:10px; }
+.panel-icons { display:flex; gap:3px; }
+.p-icon {
+  width:20px; height:20px; border-radius:4px; display:flex;
+  align-items:center; justify-content:center; font-size:10px; font-weight:700; color:#fff;
+}
+.ic-tw { background:#000; } .ic-fb { background:#1877F2; }
+.ic-li { background:#0A66C2; } .ic-lk { background:var(--azul); font-size:13px; }
+.panel-title { font-size:12px; font-weight:500; }
+.panel-sub { font-size:10px; color:var(--t3); margin-top:1px; }
+.panel-right { display:flex; align-items:center; gap:7px; }
+.panel-badge {
+  font-size:9px; padding:2px 7px; border-radius:99px;
+  background:var(--naranja); color:#fff; font-weight:500; display:none;
+}
+.chevron { font-size:11px; color:var(--t3); transition:transform .2s; }
+.chevron.open { transform:rotate(180deg); }
+.panel-body { padding:12px 14px; border-top:1px solid var(--border); display:none; }
+.panel-hint {
+  font-size:11px; color:var(--t2); background:var(--bbg);
+  border-radius:var(--r); padding:7px 10px; margin-bottom:10px; line-height:1.6;
+}
+.panel-hint a { color:var(--azul); text-decoration:none; }
+.panel-hint code { font-family:var(--mono); font-size:10px; background:var(--border); padding:1px 4px; border-radius:3px; }
+
+/* Social tabs */
+.sp-tabs { display:flex; gap:5px; margin-bottom:8px; flex-wrap:wrap; }
+.sp-tab {
+  font-size:11px; padding:3px 10px; border-radius:99px;
+  border:1px solid var(--border); background:transparent;
+  color:var(--t2); cursor:pointer;
+}
+.sp-tab:hover { background:var(--s2); }
+.sp-tab.active { background:var(--azulD); color:#fff; border-color:var(--azulD); }
+.sp-area { display:none; flex-direction:column; gap:5px; }
+.sp-area.active { display:flex; }
+.sp-hint {
+  font-size:11px; color:var(--t2); background:var(--s2);
+  border-radius:var(--r); padding:6px 9px; line-height:1.5;
+}
+.sp-hint a { color:var(--azul); text-decoration:none; }
+.sp-hint code { font-family:var(--mono); font-size:10px; background:var(--border); padding:1px 4px; border-radius:3px; }
+.sp-ta {
+  width:100%; min-height:80px; max-height:160px; padding:8px 10px;
+  border:1px solid var(--border); border-radius:var(--r);
+  font-family:var(--sans); font-size:12px; color:var(--text);
+  background:var(--bg); resize:vertical; outline:none; line-height:1.6;
+}
+.sp-ta:focus { border-color:var(--azul); }
+.sp-ta::placeholder { color:var(--t3); }
+.sp-chars { font-family:var(--mono); font-size:10px; color:var(--t3); text-align:right; }
+.panel-footer {
+  display:flex; align-items:center; justify-content:space-between;
+  margin-top:8px; padding-top:8px; border-top:1px solid var(--border);
+}
+.panel-total { font-size:11px; color:var(--t3); }
+.clear-btn {
+  font-size:11px; padding:3px 9px; border-radius:var(--r);
+  border:1px solid var(--border); background:transparent;
+  color:var(--t3); cursor:pointer;
+}
+.clear-btn:hover { background:var(--rbg); color:var(--rtx); }
+
+/* Links */
+.links-list { display:flex; flex-direction:column; gap:4px; margin-bottom:6px; }
+.link-item {
+  display:flex; align-items:flex-start; gap:8px; padding:7px 9px;
+  background:var(--s2); border:1px solid var(--border); border-radius:var(--r);
+}
+.link-favicon { width:14px; height:14px; border-radius:2px; flex-shrink:0; margin-top:2px; }
+.link-info { flex:1; min-width:0; }
+.link-title { font-size:11px; font-weight:500; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.link-url { font-size:10px; color:var(--t3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.link-del { background:none; border:none; cursor:pointer; font-size:15px; color:var(--t3); padding:0 2px; flex-shrink:0; }
+.link-del:hover { color:var(--rtx); }
+.link-add-row { display:flex; gap:5px; flex-wrap:wrap; }
+.link-input {
+  flex:1; min-width:140px; background:var(--bg);
+  border:1px solid var(--border); border-radius:var(--r);
+  color:var(--text); font-size:11px; padding:5px 8px; outline:none;
+}
+.link-input:focus { border-color:var(--azul); }
+.link-input::placeholder { color:var(--t3); }
+.link-input.err { border-color:var(--rtx); }
+.link-add-btn {
+  background:var(--azulD); color:#fff; border:none;
+  border-radius:var(--r); font-size:12px; padding:5px 12px; cursor:pointer; white-space:nowrap;
+}
+.link-add-btn:hover { opacity:.85; }
+.link-note { font-size:10px; color:var(--t3); margin-top:4px; }
+
+/* Empty */
+.empty-state {
+  display:flex; flex-direction:column; align-items:center;
+  justify-content:center; min-height:360px; text-align:center; gap:10px;
+}
+.empty-icon {
+  width:44px; height:44px; border:1.5px solid #bbb6ae;
+  border-radius:50%; display:flex; align-items:center; justify-content:center; margin-bottom:4px;
+}
+.empty-title { font-size:15px; font-weight:500; }
+.empty-sub { font-size:13px; color:var(--t3); max-width:300px; line-height:1.6; }
+.kw-hint { font-size:11px; color:var(--btx); background:var(--bbg); border-radius:var(--r); padding:7px 12px; max-width:320px; line-height:1.5; }
+
+/* Progress */
+.progress-wrap {
+  display:none; max-width:420px; margin:50px auto;
+  padding:22px; background:var(--surface); border:1px solid var(--border); border-radius:var(--rl);
+}
+.progress-title { font-family:var(--mono); font-size:10px; letter-spacing:.1em; color:var(--t3); text-transform:uppercase; margin-bottom:14px; }
+.pstep { display:flex; align-items:center; gap:10px; padding:7px 0; font-size:12px; color:var(--t3); border-bottom:1px solid var(--border); }
+.pstep:last-child { border-bottom:none; }
+.pstep.done { color:var(--gtx); }
+.pstep.active { color:var(--text); font-weight:500; }
+.pstep-dot { width:16px; height:16px; border-radius:50%; border:1.5px solid currentColor; display:flex; align-items:center; justify-content:center; font-size:8px; flex-shrink:0; }
+.pstep.active .pstep-dot { border-color:var(--azul); animation:spin .8s linear infinite; border-right-color:transparent; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* Results */
+.results-wrap { display:none; }
+.metrics-row { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px; margin-bottom:14px; }
+.mc { background:var(--surface); border:1px solid var(--border); border-radius:var(--rl); padding:11px 13px; border-top:3px solid transparent; }
+.mc-label { font-family:var(--mono); font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:var(--t3); margin-bottom:4px; }
+.mc-value { font-size:22px; font-weight:600; color:var(--text); line-height:1; margin-bottom:2px; }
+.mc-sub { font-size:10px; color:var(--t3); }
+.badge { font-family:var(--mono); font-size:9px; letter-spacing:.04em; text-transform:uppercase; padding:2px 7px; border-radius:99px; }
+.b-g { background:var(--gbg); color:var(--gtx); }
+.b-r { background:var(--rbg); color:var(--rtx); }
+.b-a { background:var(--abg); color:var(--atx); }
+.b-b { background:var(--bbg); color:var(--btx); }
+.g2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+.g1 { margin-bottom:12px; }
+.card { background:var(--surface); border:1px solid var(--border); border-radius:var(--rl); overflow:hidden; }
+.card-head { padding:9px 14px; border-bottom:1px solid var(--border); background:var(--s2); }
+.card-title { font-family:var(--mono); font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:var(--t3); }
+.card-body { padding:14px; }
+.prose { font-size:12px; color:var(--text); line-height:1.75; }
+.prose p { margin-bottom:8px; }
+.prose p:last-child { margin-bottom:0; }
+.alert-item { display:flex; gap:8px; padding:9px 12px; border-left:3px solid var(--naranja); background:var(--abg); margin-bottom:4px; }
+.alert-item:last-child { margin-bottom:0; }
+.alert-dot { width:6px; height:6px; border-radius:50%; background:var(--naranja); margin-top:4px; flex-shrink:0; }
+.alert-text { font-size:12px; color:var(--atx); line-height:1.5; }
+.news-item { padding:10px 0; border-bottom:1px solid var(--border); }
+.news-item:first-child { padding-top:0; }
+.news-item:last-child { border-bottom:none; padding-bottom:0; }
+.news-src { font-family:var(--mono); font-size:9px; letter-spacing:.06em; text-transform:uppercase; color:var(--t3); margin-bottom:2px; }
+.news-title { font-size:13px; font-weight:500; color:var(--text); line-height:1.4; margin-bottom:4px; }
+.news-sum { font-size:11px; color:var(--t2); line-height:1.5; margin-bottom:5px; }
+.news-meta { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.news-topic { font-size:10px; color:var(--t3); }
+.news-link { font-size:10px; color:var(--azul); text-decoration:none; margin-left:auto; }
+.news-link:hover { text-decoration:underline; }
+.temas-wrap { display:flex; flex-wrap:wrap; gap:6px; }
+.tema-tag { font-size:11px; padding:4px 10px; border-radius:99px; background:var(--s2); color:var(--t2); border:1px solid var(--border); }
+.kw-used { background:var(--s2); border-radius:var(--r); padding:9px 12px; font-size:11px; color:var(--t3); margin-bottom:12px; line-height:1.6; }
+.bar-row { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+.bar-label { font-size:10px; color:var(--t2); width:140px; flex-shrink:0; }
+.bar-track { flex:1; background:var(--s2); border-radius:99px; height:6px; overflow:hidden; }
+.bar-fill { height:100%; background:var(--azul); border-radius:99px; }
+.bar-num { font-size:10px; color:var(--t3); width:18px; text-align:right; }
+
+/* Footer */
+.footer-bar {
+  display:none; align-items:center; justify-content:space-between;
+  padding:10px 24px; border-top:1px solid var(--border);
+  background:var(--surface); font-family:var(--mono); font-size:10px; color:var(--t3);
+}
+.footer-btns { display:flex; gap:7px; }
+.btn-copy {
+  background:transparent; border:1px solid var(--border); border-radius:var(--r);
+  color:var(--t2); font-family:var(--sans); font-size:12px; padding:5px 11px; cursor:pointer;
+}
+.btn-copy:hover { background:var(--s2); }
+.btn-export {
+  background:var(--azulD); color:#fff; border:1px solid var(--azulD);
+  border-radius:var(--r); font-family:var(--sans); font-size:12px; padding:5px 11px; cursor:pointer;
+}
+.btn-export:hover { opacity:.85; }
+
+@media(max-width:860px) {
+  .layout { grid-template-columns:1fr; }
+  .sidebar { height:auto; position:relative; }
+  .metrics-row { grid-template-columns:repeat(2,1fr); }
+  .g2 { grid-template-columns:1fr; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- ══ SIDEBAR ══ -->
+<aside class="sidebar" id="sidebar">
+  <div class="s-brand">
+    <span class="inst">Contraloría General de la República</span>
+    <h1>Monitor de Entorno Político-Mediático</h1>
+    <span class="ver">v4.0 · Costa Rica</span>
+  </div>
+
+  <div class="s-sep"></div>
+
+  <!-- RSS -->
+  <div>
+    <div class="s-label">Fuentes de búsqueda</div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <div style="background:rgba(42,122,64,.2);border:1px solid rgba(42,122,64,.35);border-radius:6px;padding:7px 10px">
+        <div style="font-size:11px;font-weight:500;color:rgba(255,255,255,.85);margin-bottom:2px">🔍 Google Custom Search</div>
+        <div style="font-size:9px;color:rgba(255,255,255,.45);line-height:1.5">Búsqueda exacta por cada palabra clave en 12 medios costarricenses.</div>
+      </div>
+      <div style="background:rgba(40,90,180,.2);border:1px solid rgba(40,90,180,.35);border-radius:6px;padding:7px 10px">
+        <div style="font-size:11px;font-weight:500;color:rgba(255,255,255,.75);margin-bottom:2px">📰 Google News RSS</div>
+        <div style="font-size:9px;color:rgba(255,255,255,.4);line-height:1.5">Cobertura complementaria de toda la web.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="s-sep"></div>
+
+  <!-- KW -->
+  <div>
+    <div class="s-label">
+      Palabras clave
+      <button id="btn-reset">Restaurar</button>
+    </div>
+
+    <!-- Grupo CGR -->
+    <div class="kw-group">
+      <div class="kw-group-title">
+        <span class="kw-group-name"><span class="dot d-azul"></span>Menciones CGR</span>
+        <span class="kw-count" id="cnt-cgr"></span>
+      </div>
+      <div class="kw-list" id="list-cgr"></div>
+      <div class="kw-add-row">
+        <input class="kw-add-input" id="inp-cgr" placeholder="Agregar término...">
+        <button class="kw-add-btn" id="btn-cgr">+</button>
+      </div>
+    </div>
+
+    <!-- Grupo Temas -->
+    <div class="kw-group">
+      <div class="kw-group-title">
+        <span class="kw-group-name"><span class="dot d-naranja"></span>Temas institucionales</span>
+        <span class="kw-count" id="cnt-temas"></span>
+      </div>
+      <div class="kw-list" id="list-temas"></div>
+      <div class="kw-add-row">
+        <input class="kw-add-input" id="inp-temas" placeholder="Agregar tema...">
+        <button class="kw-add-btn" id="btn-temas">+</button>
+      </div>
+    </div>
+
+    <!-- Grupo Coyuntura -->
+    <div class="kw-group">
+      <div class="kw-group-title">
+        <span class="kw-group-name"><span class="dot d-verde"></span>Coyuntura actual</span>
+        <span class="kw-count" id="cnt-coy"></span>
+      </div>
+      <div class="kw-list" id="list-coy"></div>
+      <div class="kw-add-row">
+        <input class="kw-add-input" id="inp-coy" placeholder="Ej: red 5G Costa Rica...">
+        <button class="kw-add-btn" id="btn-coy">+</button>
+      </div>
+    </div>
+
+    <div class="kw-summary">
+      <div class="kw-summary-label">Total activos</div>
+      <div class="kw-summary-count" id="kw-total">—</div>
+    </div>
+  </div>
+
+  <!-- API -->
+  <!-- API Anthropic -->
+  <div class="api-section">
+    <div class="api-label">API Key de Anthropic</div>
+    <input type="password" class="api-input" id="api-key" placeholder="sk-ant-...">
+    <div class="api-note">Obtené tu clave en <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>. Se guarda en tu navegador.</div>
+  </div>
+
+  <!-- Info Google -->
+  <div style="padding-top:8px;border-top:1px solid rgba(255,255,255,.08)">
+    <div class="api-label">Google Custom Search</div>
+    <div style="font-size:9px;color:rgba(255,255,255,.3);line-height:1.5;margin-top:2px">Motor: <span style="color:rgba(255,255,255,.5)">3598b6c8aefe74808</span><br>Límite: 100 búsquedas/día gratuitas</div>
+  </div>
+</aside>
+
+<!-- ══ MAIN ══ -->
+<main class="main">
+  <div class="accent-bar"></div>
+
+  <div class="topbar">
+    <div class="topbar-left">
+      <h2>Reporte diario de entorno</h2>
+      <p id="topbar-ts">Sin datos — configurá las palabras clave y generá el reporte</p>
+    </div>
+    <div class="topbar-right">
+      <span class="rss-badge" id="rss-badge"></span>
+      <div class="status-badge" id="status-badge">EN ESPERA</div>
+      <button class="run-btn" id="run-btn">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 1.5L8.5 5L2 8.5V1.5Z" fill="currentColor"/></svg>
+        Generar reporte
+      </button>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="err-box" id="err-box">
+      <strong>Error al ejecutar</strong>
+      <span id="err-msg"></span>
+    </div>
+
+    <!-- Panel: Redes sociales -->
+    <div class="panel" id="panel-social">
+      <div class="panel-head" id="ph-social">
+        <div class="panel-head-left">
+          <div class="panel-icons">
+            <div class="p-icon ic-tw">𝕏</div>
+            <div class="p-icon ic-fb">f</div>
+            <div class="p-icon ic-li">in</div>
+          </div>
+          <div>
+            <div class="panel-title">Redes sociales <span style="font-size:11px;font-weight:400;color:var(--t3)">(opcional)</span></div>
+            <div class="panel-sub">Pegá posts encontrados manualmente — se incluirán en el análisis</div>
+          </div>
+        </div>
+        <div class="panel-right">
+          <span class="panel-badge" id="badge-social"></span>
+          <span class="chevron" id="ch-social">▼</span>
+        </div>
+      </div>
+      <div class="panel-body" id="pb-social">
+        <div class="panel-hint">
+          <strong>¿Cómo?</strong> Abrí Twitter/X, Facebook o LinkedIn en otra pestaña, buscá las palabras clave, y copiá los posts relevantes aquí.
+        </div>
+        <div class="sp-tabs" id="sp-tabs">
+          <button class="sp-tab active" data-p="tw">𝕏 Twitter/X</button>
+          <button class="sp-tab" data-p="fb">Facebook</button>
+          <button class="sp-tab" data-p="li">LinkedIn</button>
+          <button class="sp-tab" data-p="ot">Otros</button>
+        </div>
+        <div class="sp-area active" id="sp-tw">
+          <div class="sp-hint">🔍 Buscá en <a href="https://twitter.com/search?q=Contralor%C3%ADa+Costa+Rica&f=live" target="_blank">Twitter/X</a>: <code>Contraloría Costa Rica</code> · <code>CGR Costa Rica</code></div>
+          <textarea class="sp-ta" id="ta-tw" placeholder="Pegá aquí los tweets relevantes..."></textarea>
+          <div class="sp-chars" id="ch-tw">0 caracteres</div>
+        </div>
+        <div class="sp-area" id="sp-fb">
+          <div class="sp-hint">🔍 Buscá en <a href="https://www.facebook.com/search/posts/?q=Contralor%C3%ADa%20Costa%20Rica" target="_blank">Facebook</a>: <code>Contraloría Costa Rica</code></div>
+          <textarea class="sp-ta" id="ta-fb" placeholder="Pegá aquí los posts de Facebook..."></textarea>
+          <div class="sp-chars" id="ch-fb">0 caracteres</div>
+        </div>
+        <div class="sp-area" id="sp-li">
+          <div class="sp-hint">🔍 Buscá en <a href="https://www.linkedin.com/search/results/content/?keywords=Contralor%C3%ADa%20Costa%20Rica" target="_blank">LinkedIn</a></div>
+          <textarea class="sp-ta" id="ta-li" placeholder="Pegá aquí los posts de LinkedIn..."></textarea>
+          <div class="sp-chars" id="ch-li">0 caracteres</div>
+        </div>
+        <div class="sp-area" id="sp-ot">
+          <div class="sp-hint">📋 Cualquier otra fuente: YouTube, TikTok, foros, etc.</div>
+          <textarea class="sp-ta" id="ta-ot" placeholder="Pegá aquí contenido de otras plataformas..."></textarea>
+          <div class="sp-chars" id="ch-ot">0 caracteres</div>
+        </div>
+        <div class="panel-footer">
+          <span class="panel-total" id="total-social">Sin contenido agregado</span>
+          <button class="clear-btn" id="btn-clear-social">Limpiar todo</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel: Links -->
+    <div class="panel" id="panel-links">
+      <div class="panel-head" id="ph-links">
+        <div class="panel-head-left">
+          <div class="panel-icons">
+            <div class="p-icon ic-lk">🔗</div>
+          </div>
+          <div>
+            <div class="panel-title">Links adicionales <span style="font-size:11px;font-weight:400;color:var(--t3)">(opcional)</span></div>
+            <div class="panel-sub">Agregá URLs de notas que no aparezcan en el monitoreo automático</div>
+          </div>
+        </div>
+        <div class="panel-right">
+          <span class="panel-badge" id="badge-links"></span>
+          <span class="chevron" id="ch-links">▼</span>
+        </div>
+      </div>
+      <div class="panel-body" id="pb-links">
+        <div class="panel-hint">
+          <strong>¿Cómo?</strong> Pegá la URL de cualquier nota relevante que no apareció en el monitoreo. El análisis la incluirá junto con el resto.
+        </div>
+        <div class="links-list" id="links-list"></div>
+        <div class="link-add-row">
+          <input class="link-input" id="link-url" placeholder="https://www.nacion.com/nota...">
+          <input class="link-input" id="link-title" placeholder="Título (opcional)" style="max-width:180px">
+          <button class="link-add-btn" id="btn-add-link">+ Agregar</button>
+        </div>
+        <div class="link-note">El monitor buscará el contenido de cada link e incluirá la nota en el análisis.</div>
+        <div class="panel-footer">
+          <span class="panel-total" id="total-links">Sin links agregados</span>
+          <button class="clear-btn" id="btn-clear-links">Limpiar todo</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel: Información mapeada manualmente -->
+    <div class="panel" id="panel-manual">
+      <div class="panel-head" id="ph-manual">
+        <div class="panel-head-left">
+          <div class="panel-icons">
+            <div class="p-icon" style="background:#2A7A40;font-size:13px">📋</div>
+          </div>
+          <div>
+            <div class="panel-title">Información mapeada <span style="font-size:11px;font-weight:400;color:var(--t3)">(opcional)</span></div>
+            <div class="panel-sub">Noticias o información identificada manualmente por el equipo DFOE</div>
+          </div>
+        </div>
+        <div class="panel-right">
+          <span class="panel-badge" id="badge-manual"></span>
+          <span class="chevron" id="ch-manual">▼</span>
+        </div>
+      </div>
+      <div class="panel-body" id="pb-manual">
+        <div class="panel-hint">
+          <strong>¿Cómo?</strong> Pegá aquí el texto de noticias, comunicados, notas o cualquier información que el equipo haya identificado y que quieras incluir en el análisis. No necesitás URL — solo el contenido.
+        </div>
+
+        <div class="sp-tabs" id="manual-tabs">
+          <button class="sp-tab active" data-mt="noticias">📰 Noticias</button>
+          <button class="sp-tab" data-mt="institucional">🏛 Institucional</button>
+          <button class="sp-tab" data-mt="otro">📎 Otro</button>
+        </div>
+
+        <div class="sp-area active" id="mt-noticias">
+          <div class="sp-hint">Noticias que encontraste manualmente y que el monitor no capturó automáticamente.</div>
+          <textarea class="sp-ta" id="ta-manual-noticias" placeholder="Pegá aquí el texto o resumen de noticias encontradas manualmente...&#10;&#10;Ejemplo:&#10;La Nación, 28 jul — Contraloría advierte sobre recorte presupuestario...&#10;CRHoy, 27 jul — CGR resuelve recurso sobre licitación..."></textarea>
+          <div class="sp-chars" id="ch-manual-noticias">0 caracteres</div>
+        </div>
+
+        <div class="sp-area" id="mt-institucional">
+          <div class="sp-hint">Información institucional interna relevante para contextualizar el análisis.</div>
+          <textarea class="sp-ta" id="ta-manual-institucional" placeholder="Pegá aquí información institucional relevante para el análisis...&#10;&#10;Ejemplo:&#10;- La CGR emitió hoy el oficio X sobre...&#10;- Comunicado interno sobre la posición de la institución frente a..."></textarea>
+          <div class="sp-chars" id="ch-manual-institucional">0 caracteres</div>
+        </div>
+
+        <div class="sp-area" id="mt-otro">
+          <div class="sp-hint">Cualquier otra información relevante para el entorno político-mediático de la CGR.</div>
+          <textarea class="sp-ta" id="ta-manual-otro" placeholder="Pegá aquí cualquier otra información relevante..."></textarea>
+          <div class="sp-chars" id="ch-manual-otro">0 caracteres</div>
+        </div>
+
+        <div class="panel-footer">
+          <span class="panel-total" id="total-manual">Sin información agregada</span>
+          <button class="clear-btn" id="btn-clear-manual">Limpiar todo</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Empty -->
+    <div class="empty-state" id="empty-state">
+      <div class="empty-icon">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="#9e9a94" stroke-width="1.2"/><path d="M10 6v5M10 13.5v.5" stroke="#9e9a94" stroke-width="1.2" stroke-linecap="round"/></svg>
+      </div>
+      <div class="empty-title">Listo para monitorear</div>
+      <div class="empty-sub">Revisá las palabras clave en el panel izquierdo, luego presioná "Generar reporte".</div>
+      <div class="kw-hint" id="kw-hint"></div>
+    </div>
+
+    <!-- Progress -->
+    <div class="progress-wrap" id="progress-wrap">
+      <div class="progress-title">Ejecutando monitoreo</div>
+      <div id="progress-steps"></div>
+    </div>
+
+    <!-- Results -->
+    <div class="results-wrap" id="results-wrap"></div>
+  </div>
+
+  <div class="footer-bar" id="footer-bar">
+    <span id="footer-ts">—</span>
+    <div class="footer-btns">
+      <button class="btn-copy" id="btn-copy">Copiar resumen</button>
+      <button class="btn-export" id="btn-export">⬇ Exportar HTML</button>
+    </div>
+  </div>
+</main>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════
+//  CONFIGURACIÓN
+// ══════════════════════════════════════════════════
+const DEFAULTS = {
+  cgr:   ['Contraloría General República','CGR Costa Rica','Marta Acosta Contralora','cgrcostarica'],
+  temas: ['hacienda pública Costa Rica','contratación pública Costa Rica','presupuesto nacional Costa Rica','fiscalización fondos públicos','deuda pública Costa Rica'],
+  coy:   ['CONAVI licitación 2026','regla fiscal Costa Rica']
+};
+
+const RSS_FEEDS = [
+  { n:'CRHoy',        u:'https://www.crhoy.com/feed' },
+  { n:'Delfino.cr',   u:'https://delfino.cr/feed' },
+  { n:'Semanario U',  u:'https://semanariouniversidad.com/feed/' },
+  { n:'Teletica',     u:'https://www.teletica.com/rss' },
+  { n:'La Nación',    u:'https://www.nacion.com/arc/outboundfeeds/rss/?outputType=xml' },
+  { n:'El Financiero',u:'https://www.elfinancierocr.com/arc/outboundfeeds/rss/?outputType=xml' },
+  { n:'La República', u:'https://www.larepublica.net/feed' },
+  { n:'Amelia Rueda', u:'https://ameliarueda.com/feed' },
+];
+
+// Google News RSS — sin restricciones CORS, funciona directo desde el navegador
+function googleNewsUrl(query) {
+  const ago3 = new Date(Date.now()-3*24*3600000).toISOString().split('T')[0];
+  const q = encodeURIComponent(query + ' Costa Rica after:' + ago3);
+  return `https://news.google.com/rss/search?q=${q}&hl=es-419&gl=CR&ceid=CR:es-419`;
+}
+
+// Google Custom Search API — búsqueda exacta por término en medios costarricenses
+const GCSE_ID  = '3598b6c8aefe74808';
+const GCSE_KEY = 'AIzaSyB6ld8vbzPEL41Nnkd2M7Nx59MRLKV9Zc0';
+
+async function googleCustomSearch(query, days=3) {
+  const ago = new Date(Date.now()-days*24*3600000).toISOString().split('T')[0];
+  // Agregar operador after: a la query para forzar resultados recientes
+  const q = encodeURIComponent(query + ' Costa Rica after:' + ago);
+
+  const urls = [
+    `https://www.googleapis.com/customsearch/v1?key=${GCSE_KEY}&cx=${GCSE_ID}&q=${q}&dateRestrict=d${days}&num=10&lr=lang_es&gl=cr`,
+    // Fallback sin dateRestrict pero manteniendo after: en la query
+    `https://www.googleapis.com/customsearch/v1?key=${GCSE_KEY}&cx=${GCSE_ID}&q=${q}&num=10&lr=lang_es&gl=cr`,
+  ];
+
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (!data.items || data.items.length === 0) continue;
+
+      return data.items.map(item => {
+        // Extraer fecha de múltiples fuentes posibles
+        const fecha =
+          item.pagemap?.newsarticle?.[0]?.datepublished ||
+          item.pagemap?.metatags?.[0]?.['article:published_time'] ||
+          item.pagemap?.metatags?.[0]?.['og:updated_time'] ||
+          item.pagemap?.metatags?.[0]?.['date'] ||
+          item.pagemap?.hcard?.[0]?.bday || '';
+
+        return {
+          fuente:      item.displayLink || '',
+          titulo:      item.title || '',
+          url:         item.link || '',
+          desc:        item.snippet || '',
+          fecha,
+          kwOrigen:    query,
+          fuente_tipo: 'google_custom_search',
+        };
+      });
+    } catch { continue; }
+  }
+  return [];
+}
+
+const KW_KEY  = 'cgr_kw_v4';
+const API_KEY = 'cgr_api_key';
+const STEPS = [
+  'Google Custom Search — buscando por cada término (gratis)...',
+  'Google News RSS — complementando cobertura...',
+  'Preparando noticias para análisis...',
+  'Claude analizando sentimiento y contexto...',
+  'Generando resumen ejecutivo...',
+  'Finalizando reporte...',
+];
+
+// ══════════════════════════════════════════════════
+//  ESTADO
+// ══════════════════════════════════════════════════
+let KW   = { cgr:[], temas:[], coy:[] };
+let LINKS = [];
+let lastReport = null;
+let editingEl  = null;
+
+// ══════════════════════════════════════════════════
+//  HELPERS
+// ══════════════════════════════════════════════════
+const $ = id => document.getElementById(id);
+const allKw = () => [...KW.cgr, ...KW.temas, ...KW.coy];
+
+function saveKW() {
+  try { localStorage.setItem(KW_KEY, JSON.stringify(KW)); } catch {}
+}
+function loadKW() {
+  try {
+    const s = localStorage.getItem(KW_KEY);
+    KW = s ? JSON.parse(s) : JSON.parse(JSON.stringify(DEFAULTS));
+  } catch { KW = JSON.parse(JSON.stringify(DEFAULTS)); }
+}
+
+// ══════════════════════════════════════════════════
+//  RENDER PALABRAS CLAVE
+// ══════════════════════════════════════════════════
+function renderGroup(g) {
+  const list = $('list-' + g);
+  const cnt  = $('cnt-' + g);
+  if (!list || !cnt) return;
+
+  cnt.textContent = KW[g].length + ' término' + (KW[g].length !== 1 ? 's' : '');
+
+  list.innerHTML = KW[g].map((k, i) => `
+    <div class="kw-item" id="kwi-${g}-${i}">
+      <span class="kw-text">${escHtml(k)}</span>
+      <div class="kw-actions">
+        <button class="kw-btn edit" title="Editar" data-g="${g}" data-i="${i}" data-a="edit">✎</button>
+        <button class="kw-btn" title="Eliminar" data-g="${g}" data-i="${i}" data-a="del">×</button>
+      </div>
+    </div>`).join('');
+
+  updateTotal();
+}
+
+function renderAll() {
+  ['cgr','temas','coy'].forEach(renderGroup);
+}
+
+function updateTotal() {
+  const t = allKw().length;
+  const el = $('kw-total');
+  if (el) el.textContent = t + ' palabra' + (t !== 1 ? 's' : '') + ' clave activa' + (t !== 1 ? 's' : '');
+  const hint = $('kw-hint');
+  if (hint) hint.textContent = t + ' término' + (t !== 1 ? 's' : '') + ' configurado' + (t !== 1 ? 's' : '') + '. Presioná "Generar reporte" para iniciar.';
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ══════════════════════════════════════════════════
+//  ACCIONES KW
+// ══════════════════════════════════════════════════
+function addKw(g) {
+  const inp = $('inp-' + g);
+  if (!inp) return;
+  const v = inp.value.trim();
+  if (v && !KW[g].includes(v)) {
+    KW[g].push(v);
+    saveKW();
+    renderGroup(g);
+  }
+  inp.value = '';
+  inp.focus();
+}
+
+function delKw(g, i) {
+  KW[g].splice(i, 1);
+  saveKW();
+  renderGroup(g);
+}
+
+function startEdit(g, i) {
+  cancelEdit();
+  editingEl = { g, i };
+  const el = $(`kwi-${g}-${i}`);
+  if (!el) return;
+  const val = KW[g][i];
+  el.innerHTML = `
+    <div class="kw-edit-wrap">
+      <input class="kw-edit-input" id="edit-inp" value="${escHtml(val)}">
+    </div>
+    <div class="kw-actions">
+      <button class="kw-btn ok" title="Guardar" data-a="save" data-g="${g}" data-i="${i}">✓</button>
+      <button class="kw-btn" title="Cancelar" data-a="cancel">✕</button>
+    </div>`;
+  const inp = $('edit-inp');
+  if (inp) {
+    inp.focus();
+    inp.select();
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter')  saveEdit(g, i);
+      if (e.key === 'Escape') cancelEdit();
+    });
+  }
+}
+
+function saveEdit(g, i) {
+  const inp = $('edit-inp');
+  const val = inp ? inp.value.trim() : '';
+  if (val) KW[g][i] = val;
+  editingEl = null;
+  saveKW();
+  renderGroup(g);
+}
+
+function cancelEdit() {
+  if (!editingEl) return;
+  const { g } = editingEl;
+  editingEl = null;
+  renderGroup(g);
+}
+
+// delegación de eventos para listas KW
+function setupKwList(g) {
+  const list = $('list-' + g);
+  if (!list) return;
+  list.addEventListener('click', e => {
+    const btn = e.target.closest('[data-a]');
+    if (!btn) return;
+    const a = btn.dataset.a;
+    const bg = btn.dataset.g;
+    const bi = parseInt(btn.dataset.i);
+    if (a === 'del')    delKw(bg, bi);
+    if (a === 'edit')   startEdit(bg, bi);
+    if (a === 'save')   saveEdit(bg, bi);
+    if (a === 'cancel') cancelEdit();
+  });
+  // click en el texto también abre edición
+  list.addEventListener('click', e => {
+    const span = e.target.closest('.kw-text');
+    if (!span) return;
+    const item = span.closest('[id^="kwi-"]');
+    if (!item) return;
+    const [,ig,ii] = item.id.split('-');
+    startEdit(ig, parseInt(ii));
+  });
+}
+
+// ══════════════════════════════════════════════════
+//  INFORMACIÓN MAPEADA MANUALMENTE
+// ══════════════════════════════════════════════════
+function getManualInfo() {
+  const labels = {
+    noticias:      'NOTICIAS MAPEADAS MANUALMENTE',
+    institucional: 'INFORMACIÓN INSTITUCIONAL',
+    otro:          'OTRA INFORMACIÓN RELEVANTE'
+  };
+  return ['noticias','institucional','otro']
+    .map(k => {
+      const t = $('ta-manual-'+k)?.value?.trim();
+      return t ? `=== ${labels[k]} ===\n${t}` : '';
+    })
+    .filter(Boolean).join('\n\n');
+}
+
+function updateManualUI() {
+  let total = 0;
+  ['noticias','institucional','otro'].forEach(k => {
+    const len = $('ta-manual-'+k)?.value?.trim().length || 0;
+    const el = $('ch-manual-'+k);
+    if (el) el.textContent = len + ' caracteres';
+    total += len;
+  });
+  const active = ['noticias','institucional','otro'].filter(k => $('ta-manual-'+k)?.value?.trim());
+  const tot = $('total-manual');
+  const badge = $('badge-manual');
+  if (total > 0) {
+    if (tot) { tot.textContent = total + ' chars · ' + active.length + ' sección' + (active.length > 1 ? 'es' : ''); tot.style.color = 'var(--gtx)'; }
+    if (badge) { badge.textContent = active.length; badge.style.display = 'inline-block'; badge.style.background = '#2A7A40'; }
+  } else {
+    if (tot) { tot.textContent = 'Sin información agregada'; tot.style.color = ''; }
+    if (badge) badge.style.display = 'none';
+  }
+}
+function domain(url) {
+  try { return new URL(url).hostname.replace('www.',''); }
+  catch { return url; }
+}
+
+function addLink() {
+  const urlEl = $('link-url');
+  const titleEl = $('link-title');
+  const url = urlEl.value.trim();
+  if (!url.startsWith('http')) {
+    urlEl.classList.add('err');
+    setTimeout(() => urlEl.classList.remove('err'), 1500);
+    return;
+  }
+  if (LINKS.find(l => l.url === url)) { urlEl.value = ''; return; }
+  LINKS.push({ url, title: titleEl.value.trim() || domain(url) });
+  urlEl.value = ''; titleEl.value = '';
+  urlEl.focus();
+  renderLinks();
+}
+
+function renderLinks() {
+  const list  = $('links-list');
+  const total = $('total-links');
+  const badge = $('badge-links');
+  if (!LINKS.length) {
+    list.innerHTML = '';
+    total.textContent = 'Sin links agregados';
+    total.style.color = '';
+    badge.style.display = 'none';
+    return;
+  }
+  list.innerHTML = LINKS.map((l, i) => `
+    <div class="link-item">
+      <img class="link-favicon" src="https://www.google.com/s2/favicons?domain=${domain(l.url)}&sz=16" onerror="this.style.display='none'">
+      <div class="link-info">
+        <div class="link-title">${escHtml(l.title)}</div>
+        <div class="link-url">${escHtml(l.url)}</div>
+      </div>
+      <button class="link-del" data-idx="${i}">×</button>
+    </div>`).join('');
+  total.textContent = LINKS.length + ' link' + (LINKS.length !== 1 ? 's' : '') + ' agregado' + (LINKS.length !== 1 ? 's' : '');
+  total.style.color = 'var(--azul)';
+  badge.textContent = LINKS.length;
+  badge.style.display = 'inline-block';
+}
+
+function getLinksText() {
+  return LINKS.length ? LINKS.map(l => `- ${l.title}: ${l.url}`).join('\n') : '';
+}
+
+// ══════════════════════════════════════════════════
+//  REDES SOCIALES
+// ══════════════════════════════════════════════════
+function getSocial() {
+  const labels = { tw:'Twitter/X', fb:'Facebook', li:'LinkedIn', ot:'Otros' };
+  return ['tw','fb','li','ot']
+    .map(p => { const t = $('ta-'+p)?.value?.trim(); return t ? `=== ${labels[p]} ===\n${t}` : ''; })
+    .filter(Boolean).join('\n\n');
+}
+
+function updateSocialUI() {
+  let total = 0;
+  ['tw','fb','li','ot'].forEach(p => {
+    const len = $('ta-'+p)?.value?.trim().length || 0;
+    const el = $('ch-'+p);
+    if (el) el.textContent = len + ' caracteres';
+    total += len;
+  });
+  const active = ['tw','fb','li','ot'].filter(p => $('ta-'+p)?.value?.trim());
+  const tot = $('total-social');
+  const badge = $('badge-social');
+  if (total > 0) {
+    tot.textContent = total + ' chars en ' + active.length + ' plataforma' + (active.length > 1 ? 's' : '');
+    tot.style.color = 'var(--naranja)';
+    badge.textContent = active.length;
+    badge.style.display = 'inline-block';
+  } else {
+    tot.textContent = 'Sin contenido agregado';
+    tot.style.color = '';
+    badge.style.display = 'none';
+  }
+}
+
+// ══════════════════════════════════════════════════
+//  PANELES COLAPSABLES
+// ══════════════════════════════════════════════════
+function togglePanel(id) {
+  const body = $('pb-' + id);
+  const ch   = $('ch-' + id);
+  if (!body || !ch) return;
+  const open = body.style.display === 'block';
+  body.style.display = open ? 'none' : 'block';
+  ch.classList.toggle('open', !open);
+}
+
+// ══════════════════════════════════════════════════
+//  GOOGLE NEWS RSS — sin proxy, funciona directo
+// ══════════════════════════════════════════════════
+async function fetchGoogleNews(query) {
+  try {
+    const url = googleNewsUrl(query);
+    const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
+    if (!res.ok) return [];
+    const text = await res.text();
+    const doc  = new DOMParser().parseFromString(text, 'text/xml');
+    const items = Array.from(doc.querySelectorAll('item'));
+    return items.map(el => {
+      // Google News pone el medio en el <source> o al final del título
+      const source = el.querySelector('source')?.textContent?.trim() || 'Google News';
+      const title  = el.querySelector('title')?.textContent?.trim() || '';
+      // Limpiar "- Nombre del medio" del final del título si lo tiene
+      const cleanTitle = title.replace(/\s[-–]\s[^-–]+$/, '').trim();
+      return {
+        fuente: source,
+        titulo: cleanTitle || title,
+        url:    el.querySelector('link')?.textContent?.trim() || '',
+        desc:   el.querySelector('description')?.textContent?.replace(/<[^>]*>/g,'').trim().slice(0,300) || '',
+        fecha:  el.querySelector('pubDate')?.textContent?.trim() || '',
+        kwOrigen: query,
+      };
+    });
+  } catch { return []; }
+}
+
+function isRecent(d, h=168) { // 7 días = 168h
+  if (!d) return false;
+  try { return new Date(d) >= new Date(Date.now() - h*3600000); }
+  catch { return false; }
+}
+
+async function readAllRSS(days=3) {
+  const kws = allKw();
+  const seenUrls = new Set();
+  const all = [];
+
+  // ── FUENTE 1: Google Custom Search (búsqueda exacta por cada término) ──
+  // Una búsqueda por cada palabra clave + 3 búsquedas generales CGR
+  const cseQueries = [
+    ...kws,
+    'Contraloría General República Costa Rica',
+    'CGR Costa Rica auditoría',
+    'hacienda pública Costa Rica',
+  ];
+
+  const cseResults = await Promise.allSettled(
+    cseQueries.map(q => googleCustomSearch(q, days))
+  );
+  cseResults.forEach(r => {
+    if (r.status !== 'fulfilled') return;
+    r.value.forEach(item => {
+      if (!seenUrls.has(item.url)) {
+        seenUrls.add(item.url);
+        all.push(item);
+      }
+    });
+  });
+
+  // ── FUENTE 2: Google News RSS (respaldo — cubre lo que CSE pueda perder) ──
+  const rssQueries = [
+    ...kws,
+    'Contraloría General República Costa Rica',
+    'CGR Costa Rica fiscalización',
+  ];
+  const uniqueRssQueries = [...new Set(rssQueries)];
+
+  const go = async () => {
+    const results = await Promise.allSettled(
+      uniqueRssQueries.map(q => fetchGoogleNews(q))
+    );
+    const rssAll = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
+    rssAll.forEach(item => {
+      if (!seenUrls.has(item.url) && isRecent(item.fecha, days*24)) {
+        seenUrls.add(item.url);
+        all.push({ ...item, fuente_tipo: 'google_news_rss' });
+      }
+    });
+    return all;
+  };
+
+  const timeout = new Promise(resolve => setTimeout(() => resolve(all), 14000));
+  return Promise.race([go(), timeout]).catch(() => all);
+}
+
+// ══════════════════════════════════════════════════
+//  PROGRESS
+// ══════════════════════════════════════════════════
+function setStep(i) {
+  $('progress-steps').innerHTML = STEPS.map((s, j) => {
+    const cls = j < i ? 'done' : j === i ? 'active' : '';
+    return `<div class="pstep ${cls}"><div class="pstep-dot">${j < i ? '✓' : ''}</div>${s}</div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════
+//  LLAMADA API — helper reutilizable
+// ══════════════════════════════════════════════════
+async function callClaude(apiKey, system, user, maxTokens=5000) {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: maxTokens,
+      system,
+      // Sin herramienta de búsqueda web — Claude solo analiza lo que recibe
+      // El barrido lo hacen Google Custom Search y Google News RSS desde el navegador
+      messages: [{ role: 'user', content: user }]
+    })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error?.message || `Error HTTP ${res.status}`);
+  let text = data.content.filter(b => b.type === 'text').map(b => b.text).join('');
+  text = text.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim();
+  const m = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+  return m ? m[0] : text;
+}
+
+function parseJSON(str) {
+  try { return JSON.parse(str); } catch {}
+  let s = str.trimEnd().replace(/,\s*$/, '');
+  let b=0, br=0, inStr=false, esc=false;
+  for (const ch of s) {
+    if (esc) { esc=false; continue; }
+    if (ch==='\\' && inStr) { esc=true; continue; }
+    if (ch==='"') { inStr=!inStr; continue; }
+    if (inStr) continue;
+    if (ch==='{') b++; if (ch==='}') b--;
+    if (ch==='[') br++; if (ch===']') br--;
+  }
+  for (let i=0;i<br;i++) s+=']';
+  for (let i=0;i<b;i++) s+='}';
+  try { return JSON.parse(s); } catch { return null; }
+}
+
+// ══════════════════════════════════════════════════
+//  MONITOREO — DOS LLAMADAS
+// ══════════════════════════════════════════════════
+async function runMonitor() {
+  const apiKey = $('api-key').value.trim();
+  if (!apiKey) { showErr('Ingresá tu API key en el panel izquierdo.'); return; }
+  if (!allKw().length) { showErr('Agregá al menos una palabra clave.'); return; }
+
+  const btn  = $('run-btn');
+  const badge = $('status-badge');
+  const rssB  = $('rss-badge');
+
+  btn.disabled = true;
+  badge.textContent = 'EJECUTANDO'; badge.className = 'status-badge run';
+  $('err-box').style.display     = 'none';
+  $('empty-state').style.display = 'none';
+  $('results-wrap').style.display = 'none';
+  $('footer-bar').style.display   = 'none';
+  $('progress-wrap').style.display = 'block';
+  rssB.style.display = 'none';
+  setStep(0);
+  await new Promise(r => setTimeout(r, 60));
+
+  const now   = new Date();
+  const today = now.toLocaleDateString('es-CR',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  const ago3  = new Date(Date.now()-3*24*3600000).toLocaleDateString('es-CR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const ayer  = new Date(Date.now()-1*24*3600000).toLocaleDateString('es-CR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const todayISO = now.toISOString().split('T')[0];
+  const ago3ISO  = new Date(Date.now()-3*24*3600000).toISOString().split('T')[0];
+  const kws   = allKw();
+  const social  = getSocial();
+  const links   = getLinksText();
+  const manual  = getManualInfo();
+
+  // PASO 0-1: Google Custom Search + Google News RSS (últimos 3 días)
+  $('topbar-ts').textContent = 'Google Custom Search + Google News RSS (últimos 3 días)...';
+  const rssItems = await readAllRSS(3);
+  setStep(1);
+
+  const cseCount = rssItems.filter(n => n.fuente_tipo === 'google_custom_search').length;
+  const rssCount = rssItems.filter(n => n.fuente_tipo !== 'google_custom_search').length;
+  const totalLabel = rssItems.length > 0
+    ? `${rssItems.length} noticias (CSE:${cseCount} + RSS:${rssCount})`
+    : 'Sin resultados — continuando con búsqueda web';
+  rssB.textContent   = totalLabel;
+  rssB.style.display = 'inline-block';
+  rssB.style.background  = rssItems.length > 0 ? '' : 'var(--abg)';
+  rssB.style.color       = rssItems.length > 0 ? '' : 'var(--atx)';
+  rssB.style.borderColor = rssItems.length > 0 ? '' : 'var(--abg)';
+
+  const rssText = rssItems.length
+    ? rssItems.slice(0,40).map(n=>`[${n.fuente}] ${n.titulo} (${n.fecha}) URL:${n.url} KW:"${n.kwOrigen}"`).join('\n')
+    : 'Sin resultados de Google News.';
+
+  // ── UNA SOLA LLAMADA: ANÁLISIS CON DOBLE SENTIMIENTO ──
+  // El barrido ya lo hicieron Google Custom Search + Google News RSS
+  // Claude solo recibe los resultados y analiza — sin búsquedas web internas
+  setStep(2);
+  $('topbar-ts').textContent = 'Analizando noticias con doble sentimiento...';
+
+  // Usar directamente los resultados del RSS/CSE como noticias recolectadas
+  const noticiasRecolectadas = rssItems.map(n => ({
+    fuente:            n.fuente || '',
+    fecha_publicacion: n.fecha  || '',
+    titulo:            n.titulo || '',
+    url:               n.url    || '',
+    contenido_completo: n.desc  || '',
+    palabra_clave:     n.kwOrigen || '',
+  }));
+
+  // Agregar links manuales
+  if (links) {
+    links.split('\n').filter(l => l.trim()).forEach(l => {
+      noticiasRecolectadas.push({
+        fuente: 'Link manual', fecha_publicacion: todayISO,
+        titulo: l, url: '', contenido_completo: l, palabra_clave: 'manual'
+      });
+    });
+  }
+
+  rssB.textContent = `${noticiasRecolectadas.length} noticias para analizar`;
+  rssB.style.background  = 'var(--gbg)';
+  rssB.style.color       = 'var(--gtx)';
+  rssB.style.borderColor = '#c0e0c8';
+
+  // Filtrar noticias por fecha antes de pasar a Llamada 2
+  // Solo incluir las que tienen fecha dentro del período O sin fecha (las que Claude encontró)
+  const fechaLimite = new Date(Date.now() - 3*24*3600000);
+  const noticiasValidas = noticiasRecolectadas.filter(n => {
+    if (!n.fecha_publicacion) return true; // sin fecha: dejar pasar, Claude decidirá
+    const f = new Date(n.fecha_publicacion);
+    return isNaN(f.getTime()) || f >= fechaLimite; // fecha inválida o dentro del período
+  });
+
+  rssB.textContent = `${noticiasValidas.length} noticias encontradas`;
+  rssB.style.background  = 'var(--gbg)';
+  rssB.style.color       = 'var(--gtx)';
+  rssB.style.borderColor = '#c0e0c8';
+
+  // ── LLAMADA 2: ANÁLISIS CON DOBLE SENTIMIENTO ──
+  setStep(3);
+  $('topbar-ts').textContent = 'Llamada 2/2 — Analizando con doble sentimiento...';
+
+  const noticiasParaAnalizar = noticiasValidas.slice(0,40)
+    .map((n,i)=>`${i+1}.[${n.fuente||''}] "${n.titulo||''}" (${n.fecha_publicacion||'fecha no disponible'}) — ${n.contenido_completo||''} URL:${n.url||''} KW:${n.palabra_clave||''}`)
+    .join('\n');
+
+  const sys2 = `Sos el analista de entorno mediático de la CGR de Costa Rica. Recibís noticias ya recolectadas y debés analizarlas con DOBLE SENTIMIENTO.
+
+⚠️ REGLA DE FECHA ESTRICTA: Solo incluí en el JSON noticias cuya fecha sea entre ${ago3} y ${today}. Si una noticia tiene fecha anterior a ${ago7}, DESCARTALA completamente del array "noticias". No la menciones ni la analices.
+
+1. sentimiento_noticia: El tono del hecho en sí (¿es positivo, negativo o neutral como noticia?)
+2. sentimiento_cgr: Cómo posiciona esto a la CGR institucionalmente (¿Favorable, Neutral o Desfavorable para la imagen de la Contraloría?)
+
+ESTOS PUEDEN SER DISTINTOS — ejemplos:
+• "CGR detecta irregularidades en CONAVI" → sentimiento_noticia:Negativo / sentimiento_cgr:Favorable (la CGR cumple su rol fiscalizador)
+• "Cuestionan demora de CGR en criterio" → sentimiento_noticia:Negativo / sentimiento_cgr:Desfavorable
+• "CGR aprueba presupuesto del BCCR" → sentimiento_noticia:Positivo / sentimiento_cgr:Favorable
+
+En "temas_relevantes" usá siempre strings simples, nunca objetos.
+
+Respondé SOLO con JSON válido:
+{"fecha":"","periodo":"Últimos 3 días (${ago3} al ${today})","resumen_ejecutivo":"3 párrafos\\n\\n","alertas":[],"metricas":{"total_menciones":0,"articulos_prensa":0,"menciones_redes":0,"sentimiento_entorno":"Mixto","posicionamiento_cgr":"Favorable|Neutral|Desfavorable|Mixto","nivel_riesgo":"Bajo|Medio|Alto"},"noticias":[{"fuente":"","fecha_publicacion":"","titulo":"","resumen":"","sentimiento_noticia":"Positivo|Neutral|Negativo","sentimiento_cgr":"Favorable|Neutral|Desfavorable","razon_cgr":"una oración","tema":"","palabra_clave":"","url":""}],"redes_sociales":[{"plataforma":"","autor":"","fecha":"","contenido":"","sentimiento_noticia":"Positivo|Neutral|Negativo","sentimiento_cgr":"Favorable|Neutral|Desfavorable","alcance":"Alto|Medio|Bajo"}],"temas_relevantes":["string","string"],"cobertura_por_medio":{"La Nación":0,"CRHoy":0,"El Financiero":0,"Teletica":0,"Semanario Universidad":0,"Otros":0},"contexto_politico":"2 párrafos"}`;
+
+  const user2 = `Analizá estas ${noticiasValidas.length} noticias (${ago3} al ${today}):
+
+${noticiasParaAnalizar}
+
+${social ? `REDES SOCIALES MANUALES (con doble sentimiento):\n${social}` : ''}
+
+${manual ? `INFORMACIÓN MAPEADA POR EL EQUIPO DFOE (alta prioridad — es información verificada internamente, incorporala al análisis y al resumen ejecutivo):\n${manual}` : ''}
+
+Para cada noticia asigná sentimiento_noticia Y sentimiento_cgr por separado. En el resumen ejecutivo destacá los casos donde difieren y cualquier información mapeada manualmente.
+
+Generá el JSON completo.`;
+
+  const timers = [3000,6000,10000].map((t,i) => setTimeout(()=>setStep(i+3), t));
+
+  try {
+    const raw2 = await callClaude(apiKey, sys2, user2, 6000);
+    timers.forEach(clearTimeout);
+    setStep(6);
+
+    const report = parseJSON(raw2);
+    if (!report || typeof report !== 'object') throw new Error('Análisis devolvió respuesta inválida. Intentá de nuevo.');
+
+    lastReport = report;
+    renderResults(report);
+    badge.textContent = 'COMPLETADO'; badge.className = 'status-badge done';
+    const ts = new Date().toLocaleString('es-CR',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short'});
+    $('topbar-ts').textContent = `Actualizado: ${ts} · Últimos 3 días · ${noticiasValidas.length} noticias analizadas`;
+
+  } catch(e) {
+    timers.forEach(clearTimeout);
+    showErr(e.message);
+    badge.textContent = 'ERROR'; badge.className = 'status-badge err';
+    $('empty-state').style.display = 'flex';
+  } finally {
+    btn.disabled = false;
+    $('progress-wrap').style.display = 'none';
+  }
+}
+
+function showErr(msg) {
+  $('err-msg').textContent = ' ' + msg;
+  $('err-box').style.display = 'block';
+  $('progress-wrap').style.display = 'none';
+}
+
+// ══════════════════════════════════════════════════
+//  RENDER RESULTADOS
+// ══════════════════════════════════════════════════
+function sb(s) {
+  const m = {Positivo:'b-g',Negativo:'b-r',Neutral:'b-a',Mixto:'b-b'};
+  return `<span class="badge ${m[s]||'b-a'}">${s||'Neutral'}</span>`;
+}
+function rc(r) { return {Bajo:'b-g',Medio:'b-a',Alto:'b-r'}[r]||'b-a'; }
+
+function renderResults(r) {
+  const m = r.metricas || {};
+  const SC = {Positivo:'#2A7A40',Negativo:'#8a1a1a',Neutral:'#7a4e0a',Mixto:'#1a4f8a'};
+  const SB = {Positivo:'#e6f4ea',Negativo:'#fbeaea',Neutral:'#fdf3e0',Mixto:'#e8f1fb'};
+
+  const alertsH = (r.alertas||[]).length
+    ? `<div class="g1"><div class="card"><div class="card-head"><span class="card-title">⚠ Alertas del período</span></div><div style="padding:0">${(r.alertas||[]).map(a=>`<div class="alert-item"><div class="alert-dot"></div><div class="alert-text">${a}</div></div>`).join('')}</div></div></div>`
+    : '';
+
+  // Agrupar noticias por palabra clave para mostrar al menos una por tema
+  const noticiasList = r.noticias || [];
+  const sinNoticias = noticiasList.filter(n => n.titulo?.includes('Sin noticias recientes'));
+  const conNoticias = noticiasList.filter(n => !n.titulo?.includes('Sin noticias recientes'));
+
+  // Badges de sentimiento doble
+  function sbN(s) { // sentimiento de la noticia
+    const m = {Positivo:'b-g',Negativo:'b-r',Neutral:'b-a'};
+    return `<span class="badge ${m[s]||'b-a'}" title="Sentimiento noticia">${s||'Neutral'}</span>`;
+  }
+  function sbC(s) { // sentimiento para la CGR
+    const m = {Favorable:'b-g',Desfavorable:'b-r',Neutral:'b-a'};
+    const icons = {Favorable:'↑','Desfavorable':'↓','Neutral':'→'};
+    return `<span class="badge ${m[s]||'b-a'}" title="Para la CGR">${icons[s]||'→'} CGR ${s||'Neutral'}</span>`;
+  }
+
+  const noticiasH = conNoticias.map(n => {
+    const distintos = n.sentimiento_noticia && n.sentimiento_cgr &&
+      ((n.sentimiento_noticia==='Negativo' && n.sentimiento_cgr==='Favorable') ||
+       (n.sentimiento_noticia==='Positivo' && n.sentimiento_cgr==='Desfavorable'));
+    return `
+    <div class="news-item" style="${distintos ? 'border-left:3px solid var(--azul);padding-left:8px' : ''}">
+      <div class="news-src">${n.fuente||''} ${n.fecha_publicacion ? '· '+n.fecha_publicacion : ''}${distintos ? ' <span style="font-size:9px;color:var(--azul);font-weight:500">⚡ Contexto diferenciado</span>' : ''}</div>
+      <div class="news-title">${n.titulo||''}</div>
+      <div class="news-sum">${n.resumen||''}</div>
+      ${n.razon_cgr ? `<div style="font-size:10px;color:var(--btx);background:var(--bbg);padding:3px 7px;border-radius:4px;margin-bottom:5px;font-style:italic">${n.razon_cgr}</div>` : ''}
+      <div class="news-meta">
+        ${sbN(n.sentimiento_noticia||n.sentimiento)}
+        ${sbC(n.sentimiento_cgr)}
+        ${n.palabra_clave ? `<span style="font-size:9px;padding:2px 7px;border-radius:99px;background:var(--azulD);color:#fff;font-family:var(--mono)">${n.palabra_clave}</span>` : (n.tema ? `<span class="news-topic">${n.tema}</span>` : '')}
+        ${n.url ? `<a href="${n.url}" class="news-link" target="_blank">Ver nota →</a>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  const sinNoticiasH = sinNoticias.length ? `
+    <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+      <div style="font-size:10px;color:var(--t3);margin-bottom:6px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em">Sin noticias esta semana para:</div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px">
+        ${sinNoticias.map(n => `<span style="font-size:10px;padding:2px 8px;border-radius:99px;background:var(--s2);color:var(--t2);border:1px solid var(--border)">${n.palabra_clave||n.tema||'—'}</span>`).join('')}
+      </div>
+    </div>` : '';
+
+  const redesH = (r.redes_sociales||[]).length
+    ? (r.redes_sociales||[]).map(rs => `
+        <div class="news-item">
+          <div class="news-src">${rs.plataforma||''} · ${rs.autor||''} · ${rs.fecha||''}</div>
+          <div class="news-sum" style="margin-bottom:5px">${rs.contenido||''}</div>
+          <div class="news-meta">
+            ${sbN(rs.sentimiento_noticia||rs.sentimiento)}
+            ${sbC(rs.sentimiento_cgr)}
+            <span class="badge b-b" style="margin-left:4px">Alcance ${rs.alcance||'Bajo'}</span>
+          </div>
+        </div>`).join('')
+    : '<p style="font-size:12px;color:var(--t3)">Sin menciones indexadas en redes. Podés pegar contenido manual en el panel superior.</p>';
+
+  const cobH = Object.entries(r.cobertura_por_medio||{}).filter(([,v])=>v>0).map(([med,cnt]) => {
+    const max = Math.max(...Object.values(r.cobertura_por_medio||{1:1}), 1);
+    return `<div class="bar-row"><span class="bar-label">${med}</span><div class="bar-track"><div class="bar-fill" style="width:${Math.round(cnt/max*100)}%"></div></div><span class="bar-num">${cnt}</span></div>`;
+  }).join('') || '<p style="font-size:12px;color:var(--t3)">Sin datos por medio.</p>';
+
+  const temasH = (r.temas_relevantes||[])
+    .map(t => typeof t === 'string' ? t : (t.tema || t.nombre || ''))
+    .filter(Boolean)
+    .map(t => `<span class="tema-tag">${t}</span>`).join('');
+  const resH   = (r.resumen_ejecutivo||'').split('\n\n').filter(p=>p.trim()).map(p=>`<p>${p}</p>`).join('');
+  const ctxH   = (r.contexto_politico||'').split('\n\n').filter(p=>p.trim()).map(p=>`<p>${p}</p>`).join('');
+
+  // Métrica de posicionamiento CGR
+  const posClass = {Favorable:'b-g',Neutral:'b-a',Desfavorable:'b-r',Mixto:'b-b'};
+  const posCGR = m.posicionamiento_cgr || 'Neutral';
+
+  $('results-wrap').innerHTML = `
+    <div class="metrics-row" style="grid-template-columns:repeat(6,minmax(0,1fr))">
+      <div class="mc" style="border-top-color:var(--azul)"><div class="mc-label">Menciones</div><div class="mc-value">${m.total_menciones||'—'}</div><div class="mc-sub">Últimos 3 días</div></div>
+      <div class="mc" style="border-top-color:#888"><div class="mc-label">Artículos</div><div class="mc-value">${m.articulos_prensa||'—'}</div><div class="mc-sub">Medios digitales</div></div>
+      <div class="mc" style="border-top-color:#28A9E0"><div class="mc-label">Redes</div><div class="mc-value">${m.menciones_redes||'—'}</div><div class="mc-sub">Público indexado</div></div>
+      <div class="mc" style="border-top-color:var(--naranja)">
+        <div class="mc-label">Sentimiento entorno</div>
+        <div class="mc-value" style="font-size:13px;margin-top:4px">${sb(m.sentimiento_entorno||m.sentimiento)}</div>
+        <div class="mc-sub">Del hecho noticioso</div>
+      </div>
+      <div class="mc" style="border-top-color:var(--azul)">
+        <div class="mc-label">Posicionamiento CGR</div>
+        <div class="mc-value" style="font-size:13px;margin-top:4px"><span class="badge ${posClass[posCGR]||'b-a'}">${posCGR}</span></div>
+        <div class="mc-sub">Para la institución</div>
+      </div>
+      <div class="mc" style="border-top-color:#2A7A40"><div class="mc-label">Riesgo</div><div class="mc-value" style="font-size:13px;margin-top:4px"><span class="badge ${rc(m.nivel_riesgo)}">${m.nivel_riesgo||'—'}</span></div><div class="mc-sub">Exposición</div></div>
+    </div>
+
+    <div style="font-size:10px;color:var(--t3);padding:5px 0 10px;font-style:italic">
+      💡 <strong>Sentimiento entorno</strong> = tono del hecho noticioso &nbsp;·&nbsp; <strong>Posicionamiento CGR</strong> = cómo impacta a la imagen institucional &nbsp;·&nbsp; ⚡ = cuando ambos difieren
+    </div>
+
+    ${alertsH}
+    <div class="g2">
+      <div class="card"><div class="card-head"><span class="card-title">Resumen ejecutivo</span></div><div class="card-body"><div class="prose">${resH}</div></div></div>
+      <div class="card"><div class="card-head"><span class="card-title">Contexto político</span></div><div class="card-body"><div class="prose">${ctxH}</div></div></div>
+    </div>
+    ${(noticiasH || sinNoticiasH) ? `<div class="g1"><div class="card"><div class="card-head"><span class="card-title">Cobertura por palabra clave — última semana</span></div><div class="card-body">${noticiasH}${sinNoticiasH}</div></div></div>` : ''}
+    <div class="g2">
+      <div class="card"><div class="card-head"><span class="card-title">Redes sociales</span></div><div class="card-body">${redesH}</div></div>
+      <div class="card"><div class="card-head"><span class="card-title">Cobertura por medio</span></div><div class="card-body">${cobH}</div></div>
+    </div>
+    ${temasH ? `<div class="g1"><div class="card"><div class="card-head"><span class="card-title">Temas relevantes</span></div><div class="card-body"><div class="temas-wrap">${temasH}</div></div></div></div>` : ''}
+    <div class="kw-used"><strong>Palabras clave monitoreadas:</strong> ${allKw().join(' · ')}</div>`;
+
+  $('results-wrap').style.display = 'block';
+  $('footer-bar').style.display   = 'flex';
+  $('footer-ts').textContent = `Reporte: ${r.fecha||''} · ${r.periodo||'Últimos 3 días'}`;
+}
+
+// ══════════════════════════════════════════════════
+//  COPIAR Y EXPORTAR
+// ══════════════════════════════════════════════════
+function copyReport() {
+  if (!lastReport) return;
+  const r = lastReport;
+  const txt = [
+    `MONITOR CGR — ${r.fecha} · ${r.periodo||''}`,
+    '', 'RESUMEN EJECUTIVO', r.resumen_ejecutivo||'',
+    '', (r.alertas||[]).length ? 'ALERTAS\n'+(r.alertas||[]).map(a=>'• '+a).join('\n') : '',
+    '', 'CONTEXTO POLÍTICO', r.contexto_politico||'',
+    '', 'TEMAS', (r.temas_relevantes||[]).join(' · '),
+    '', 'Palabras clave: '+allKw().join(', ')
+  ].join('\n');
+  navigator.clipboard.writeText(txt).then(() => {
+    const b = $('btn-copy');
+    b.textContent = 'Copiado ✓';
+    setTimeout(() => b.textContent = 'Copiar resumen', 2500);
+  });
+}
+
+function exportHTML() {
+  if (!lastReport) return;
+  const r = lastReport;
+  const m = r.metricas||{};
+  const SC = {Positivo:'#2A7A40',Negativo:'#8a1a1a',Neutral:'#7a4e0a',Mixto:'#1a4f8a'};
+  const SB = {Positivo:'#e6f4ea',Negativo:'#fbeaea',Neutral:'#fdf3e0',Mixto:'#e8f1fb'};
+  const RC = {Bajo:'#2A7A40',Medio:'#7a4e0a',Alto:'#8a1a1a'};
+  const RB = {Bajo:'#e6f4ea',Medio:'#fdf3e0',Alto:'#fbeaea'};
+  const fecha = new Date().toISOString().split('T')[0];
+
+  const bsq = (s,sc,sb) => `<span style="font-size:10px;padding:2px 7px;border-radius:99px;background:${sb[s]||sb.Neutral};color:${sc[s]||sc.Neutral};font-weight:500">${s||'Neutral'}</span>`;
+  const notH = (r.noticias||[]).map(n=>`<div style="padding:10px 0;border-bottom:1px solid #ddd9d2"><div style="font-size:9px;color:#9e9a94;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px">${n.fuente||''} ${n.fecha_publicacion?'· '+n.fecha_publicacion:''}</div><div style="font-size:13px;font-weight:500;color:#1a1917;margin-bottom:4px">${n.titulo||''}</div><div style="font-size:11px;color:#5c5954;margin-bottom:5px">${n.resumen||''}</div><div style="display:flex;align-items:center;gap:6px">${bsq(n.sentimiento,SC,SB)}${n.tema?`<span style="font-size:10px;color:#9e9a94">${n.tema}</span>`:''}${n.url?`<a href="${n.url}" style="font-size:10px;color:#384A99;margin-left:auto" target="_blank">Ver →</a>`:''}</div></div>`).join('');
+  const resH = (r.resumen_ejecutivo||'').split('\n\n').filter(p=>p.trim()).map(p=>`<p style="margin-bottom:10px;line-height:1.75">${p}</p>`).join('');
+  const ctxH = (r.contexto_politico||'').split('\n\n').filter(p=>p.trim()).map(p=>`<p style="margin-bottom:10px;line-height:1.75">${p}</p>`).join('');
+  const altH = (r.alertas||[]).map(a=>`<div style="display:flex;gap:8px;padding:9px 12px;border-left:3px solid #E57B3C;background:#fdf3e0;margin-bottom:5px"><div style="width:6px;height:6px;border-radius:50%;background:#E57B3C;margin-top:5px;flex-shrink:0"></div><div style="font-size:13px;color:#7a4e0a;line-height:1.5">${a}</div></div>`).join('');
+  const temH = (r.temas_relevantes||[])
+    .map(t => typeof t === 'string' ? t : (t.tema || t.nombre || JSON.stringify(t)))
+    .filter(Boolean)
+    .map(t=>`<span style="font-size:11px;padding:4px 10px;border-radius:99px;background:#f0ede8;color:#5c5954;border:1px solid #ddd9d2;display:inline-block;margin:3px">${t}</span>`).join('');
+
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Reporte CGR · ${r.fecha||fecha}</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',Arial,sans-serif;background:#f5f4f0;color:#1a1917}.hdr{background:#25336C;padding:18px 28px;display:flex;align-items:center;justify-content:space-between}.hdr h1{font-size:15px;font-weight:500;color:#fff}.hdr p{font-size:10px;color:rgba(255,255,255,.5);margin-top:2px}.hdr-r{text-align:right}.hdr-d{font-size:13px;color:#fff;font-weight:500;margin-bottom:4px}.pill{font-size:10px;padding:3px 10px;border-radius:99px;background:#E57B3C;color:#fff;font-weight:500}.bar{height:3px;background:#E57B3C}.wrap{max-width:920px;margin:0 auto;padding:20px 28px}.metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px}.mc{background:#fff;border:1px solid #ddd9d2;border-radius:8px;padding:10px 12px}.mc-l{font-size:9px;color:#9e9a94;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}.mc-v{font-size:20px;font-weight:600;line-height:1}.mc-s{font-size:10px;color:#9e9a94;margin-top:2px}.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}.g1{margin-bottom:12px}.sec{background:#fff;border:1px solid #ddd9d2;border-radius:8px;overflow:hidden}.sec-h{padding:8px 14px;background:#f0ede8;border-bottom:1px solid #ddd9d2;font-size:9px;font-weight:500;color:#9e9a94;text-transform:uppercase;letter-spacing:.08em}.sec-b{padding:14px}.kw-box{background:#f0ede8;border-radius:6px;padding:8px 12px;font-size:11px;color:#5c5954;line-height:1.6;margin-bottom:12px}.ftr{background:#25336C;padding:10px 28px;display:flex;justify-content:space-between;margin-top:20px}.ft{font-size:9px;color:rgba(255,255,255,.4)}@media(max-width:680px){.metrics{grid-template-columns:repeat(2,1fr)}.g2{grid-template-columns:1fr}}</style></head><body>
+<div class="hdr"><div><h1>CGR · Monitor de Entorno Político-Mediático</h1><p>Contraloría General de la República · cgr.go.cr</p></div><div class="hdr-r"><div class="hdr-d">${r.fecha||fecha}</div><span class="pill">${r.periodo||'Últimos 3 días'}</span></div></div>
+<div class="bar"></div>
+<div class="wrap">
+<div class="metrics">
+  <div class="mc" style="border-top:3px solid #384A99"><div class="mc-l">Menciones</div><div class="mc-v">${m.total_menciones||'—'}</div><div class="mc-s">Últimos 3 días</div></div>
+  <div class="mc" style="border-top:3px solid #888"><div class="mc-l">Artículos</div><div class="mc-v">${m.articulos_prensa||'—'}</div><div class="mc-s">Medios digitales</div></div>
+  <div class="mc" style="border-top:3px solid #28A9E0"><div class="mc-l">Redes</div><div class="mc-v">${m.menciones_redes||'—'}</div><div class="mc-s">Público indexado</div></div>
+  <div class="mc" style="border-top:3px solid #E57B3C"><div class="mc-l">Sentimiento</div><div class="mc-v" style="font-size:12px;margin-top:4px">${bsq(m.sentimiento,SC,SB)}</div><div class="mc-s">General</div></div>
+  <div class="mc" style="border-top:3px solid #2A7A40"><div class="mc-l">Riesgo</div><div class="mc-v" style="font-size:12px;margin-top:4px">${bsq(m.nivel_riesgo,RC,RB)}</div><div class="mc-s">Exposición</div></div>
+</div>
+${altH?`<div class="sec" style="border-left:3px solid #E57B3C;margin-bottom:12px"><div class="sec-h">⚠ Alertas</div><div style="padding:0">${altH}</div></div>`:''}
+<div class="g2">
+  <div class="sec"><div class="sec-h">Resumen ejecutivo</div><div class="sec-b" style="font-size:12px;color:#1a1917">${resH}</div></div>
+  <div class="sec"><div class="sec-h">Contexto político</div><div class="sec-b" style="font-size:12px;color:#1a1917">${ctxH}</div></div>
+</div>
+${notH?`<div class="sec g1"><div class="sec-h">Cobertura en medios</div><div class="sec-b">${notH}</div></div>`:''}
+${temH?`<div class="sec g1"><div class="sec-h">Temas relevantes</div><div class="sec-b"><div style="display:flex;flex-wrap:wrap;gap:6px">${temH}</div></div></div>`:''}
+<div class="kw-box"><strong>Palabras clave:</strong> ${allKw().join(' · ')}</div>
+</div>
+<div class="ftr"><span class="ft">Generado: ${new Date().toLocaleString('es-CR')}</span><span class="ft">Monitor CGR · cgr.go.cr</span></div>
+</body></html>`;
+
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([html],{type:'text/html;charset=utf-8'}));
+  a.download = `Reporte-CGR-${fecha}.html`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+// ══════════════════════════════════════════════════
+//  INICIALIZACIÓN
+// ══════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+
+  // Cargar KW y renderizar
+  loadKW();
+  renderAll();
+
+  // Setup listas KW
+  ['cgr','temas','coy'].forEach(g => {
+    setupKwList(g);
+    $('btn-' + g).addEventListener('click', () => addKw(g));
+    $('inp-' + g).addEventListener('keydown', e => { if (e.key === 'Enter') addKw(g); });
+  });
+
+  // Restaurar
+  $('btn-reset').addEventListener('click', () => {
+    if (confirm('¿Restaurar las palabras clave predeterminadas?')) {
+      KW = JSON.parse(JSON.stringify(DEFAULTS));
+      saveKW();
+      renderAll();
+    }
+  });
+
+  // API key
+  const saved = localStorage.getItem(API_KEY);
+  if (saved) $('api-key').value = saved;
+  $('api-key').addEventListener('change', function() {
+    localStorage.setItem(API_KEY, this.value);
+  });
+
+  // Run
+  $('run-btn').addEventListener('click', runMonitor);
+
+  // Copiar / Exportar
+  $('btn-copy').addEventListener('click', copyReport);
+  $('btn-export').addEventListener('click', exportHTML);
+
+  // Paneles colapsables
+  $('ph-social').addEventListener('click', () => togglePanel('social'));
+  $('ph-links').addEventListener('click',  () => togglePanel('links'));
+  $('ph-manual').addEventListener('click', () => togglePanel('manual'));
+
+  // Tabs del panel manual
+  document.querySelectorAll('[data-mt]').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('[data-mt]').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const mt = tab.dataset.mt;
+      ['noticias','institucional','otro'].forEach(k => {
+        $('mt-'+k).style.display = k === mt ? 'flex' : 'none';
+      });
+    });
+  });
+
+  // Textareas del panel manual
+  ['noticias','institucional','otro'].forEach(k => {
+    $('ta-manual-'+k).addEventListener('input', updateManualUI);
+  });
+
+  $('btn-clear-manual').addEventListener('click', () => {
+    if (!['noticias','institucional','otro'].some(k => $('ta-manual-'+k)?.value?.trim())) return;
+    if (confirm('¿Limpiar toda la información mapeada?')) {
+      ['noticias','institucional','otro'].forEach(k => { $('ta-manual-'+k).value = ''; });
+      updateManualUI();
+    }
+  });
+
+  // Social tabs
+  document.querySelectorAll('.sp-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.sp-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const p = tab.dataset.p;
+      document.querySelectorAll('.sp-area').forEach(a => a.classList.remove('active'));
+      $('sp-' + p).classList.add('active');
+    });
+  });
+
+  // Social textareas
+  ['tw','fb','li','ot'].forEach(p => {
+    $('ta-' + p).addEventListener('input', updateSocialUI);
+  });
+
+  // Limpiar social
+  $('btn-clear-social').addEventListener('click', () => {
+    if (!['tw','fb','li','ot'].some(p => $('ta-'+p)?.value?.trim())) return;
+    if (confirm('¿Limpiar todo el contenido de redes?')) {
+      ['tw','fb','li','ot'].forEach(p => { $('ta-'+p).value = ''; });
+      updateSocialUI();
+    }
+  });
+
+  // Links
+  $('btn-add-link').addEventListener('click', addLink);
+  $('link-url').addEventListener('keydown', e => { if (e.key === 'Enter') addLink(); });
+  $('link-title').addEventListener('keydown', e => { if (e.key === 'Enter') addLink(); });
+  $('links-list').addEventListener('click', e => {
+    const btn = e.target.closest('[data-idx]');
+    if (btn) { LINKS.splice(parseInt(btn.dataset.idx), 1); renderLinks(); }
+  });
+  $('btn-clear-links').addEventListener('click', () => {
+    if (!LINKS.length) return;
+    if (confirm('¿Limpiar todos los links?')) { LINKS = []; renderLinks(); }
+  });
+});
+</script>
+</body>
+</html>
