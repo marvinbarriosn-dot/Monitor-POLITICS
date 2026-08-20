@@ -370,14 +370,14 @@ body { font-family:var(--sans); background:var(--bg); color:var(--text); min-hei
   <!-- RSS -->
   <div>
     <div class="s-label">Fuentes de búsqueda</div>
-    <div style="display:flex;flex-direction:column;gap:6px">
+    <div style="display:flex;flex-direction:column;gap:5px">
       <div style="background:rgba(42,122,64,.2);border:1px solid rgba(42,122,64,.35);border-radius:6px;padding:7px 10px">
-        <div style="font-size:11px;font-weight:500;color:rgba(255,255,255,.85);margin-bottom:2px">🔍 Google Custom Search</div>
-        <div style="font-size:9px;color:rgba(255,255,255,.45);line-height:1.5">Búsqueda exacta por cada palabra clave en 12 medios costarricenses.</div>
+        <div style="font-size:11px;font-weight:500;color:rgba(255,255,255,.85);margin-bottom:2px">🔍 SerpAPI</div>
+        <div style="font-size:9px;color:rgba(255,255,255,.45);line-height:1.5">Búsqueda directa en Google · Sin CORS · 100 búsquedas gratuitas/mes</div>
       </div>
       <div style="background:rgba(40,90,180,.2);border:1px solid rgba(40,90,180,.35);border-radius:6px;padding:7px 10px">
         <div style="font-size:11px;font-weight:500;color:rgba(255,255,255,.75);margin-bottom:2px">📰 Google News RSS</div>
-        <div style="font-size:9px;color:rgba(255,255,255,.4);line-height:1.5">Cobertura complementaria de toda la web.</div>
+        <div style="font-size:9px;color:rgba(255,255,255,.4);line-height:1.5">Complemento de cobertura adicional</div>
       </div>
     </div>
   </div>
@@ -442,12 +442,6 @@ body { font-family:var(--sans); background:var(--bg); color:var(--text); min-hei
     <div class="api-label">API Key de Anthropic</div>
     <input type="password" class="api-input" id="api-key" placeholder="sk-ant-...">
     <div class="api-note">Obtené tu clave en <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>. Se guarda en tu navegador.</div>
-  </div>
-
-  <!-- Info Google -->
-  <div style="padding-top:8px;border-top:1px solid rgba(255,255,255,.08)">
-    <div class="api-label">Google Custom Search</div>
-    <div style="font-size:9px;color:rgba(255,255,255,.3);line-height:1.5;margin-top:2px">Motor: <span style="color:rgba(255,255,255,.5)">3598b6c8aefe74808</span><br>Límite: 100 búsquedas/día gratuitas</div>
   </div>
 </aside>
 
@@ -673,64 +667,46 @@ const RSS_FEEDS = [
 
 // Google News RSS — sin restricciones CORS, funciona directo desde el navegador
 function googleNewsUrl(query) {
-  const ago3 = new Date(Date.now()-3*24*3600000).toISOString().split('T')[0];
-  const q = encodeURIComponent(query + ' Costa Rica after:' + ago3);
+  // Google News RSS no soporta after: — filtramos por fecha después de recibir
+  const q = encodeURIComponent(query + ' Costa Rica');
   return `https://news.google.com/rss/search?q=${q}&hl=es-419&gl=CR&ceid=CR:es-419`;
 }
 
 // Google Custom Search API — búsqueda exacta por término en medios costarricenses
-const GCSE_ID  = '3598b6c8aefe74808';
-const GCSE_KEY = 'AIzaSyB6ld8vbzPEL41Nnkd2M7Nx59MRLKV9Zc0';
+// SerpAPI — búsqueda en Google sin problemas de CORS ni autenticación compleja
+const SERP_KEY = '2fd067b6db29949342e756d86275dda113dc6175715db25fefb109e89db8aebb';
 
-async function googleCustomSearch(query, days=3) {
-  const ago = new Date(Date.now()-days*24*3600000).toISOString().split('T')[0];
-  // Agregar operador after: a la query para forzar resultados recientes
-  const q = encodeURIComponent(query + ' Costa Rica after:' + ago);
-
-  const urls = [
-    `https://www.googleapis.com/customsearch/v1?key=${GCSE_KEY}&cx=${GCSE_ID}&q=${q}&dateRestrict=d${days}&num=10&lr=lang_es&gl=cr`,
-    // Fallback sin dateRestrict pero manteniendo after: en la query
-    `https://www.googleapis.com/customsearch/v1?key=${GCSE_KEY}&cx=${GCSE_ID}&q=${q}&num=10&lr=lang_es&gl=cr`,
-  ];
-
-  for (const url of urls) {
-    try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-      if (!res.ok) continue;
-      const data = await res.json();
-      if (!data.items || data.items.length === 0) continue;
-
-      return data.items.map(item => {
-        // Extraer fecha de múltiples fuentes posibles
-        const fecha =
-          item.pagemap?.newsarticle?.[0]?.datepublished ||
-          item.pagemap?.metatags?.[0]?.['article:published_time'] ||
-          item.pagemap?.metatags?.[0]?.['og:updated_time'] ||
-          item.pagemap?.metatags?.[0]?.['date'] ||
-          item.pagemap?.hcard?.[0]?.bday || '';
-
-        return {
-          fuente:      item.displayLink || '',
-          titulo:      item.title || '',
-          url:         item.link || '',
-          desc:        item.snippet || '',
-          fecha,
-          kwOrigen:    query,
-          fuente_tipo: 'google_custom_search',
-        };
-      });
-    } catch { continue; }
-  }
-  return [];
+async function serpSearch(query, days=2) {
+  // tbs=qdr:d2 = últimos 2 días, qdr:d3 = últimos 3 días
+  const tbs = `qdr:d${days}`;
+  const q = encodeURIComponent(query + ' Costa Rica');
+  const url = `https://serpapi.com/search.json?q=${q}&tbm=nws&tbs=${tbs}&location=Costa+Rica&hl=es&gl=cr&num=10&api_key=${SERP_KEY}`;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const results = data.news_results || [];
+    if (!results.length) return [];
+    return results.map(item => ({
+      fuente:      item.source || '',
+      titulo:      item.title || '',
+      url:         item.link || '',
+      desc:        item.snippet || '',
+      fecha:       item.date || '',
+      kwOrigen:    query,
+      fuente_tipo: 'serpapi',
+    }));
+  } catch { return []; }
 }
 
 const KW_KEY  = 'cgr_kw_v4';
 const API_KEY = 'cgr_api_key';
 const STEPS = [
-  'Google Custom Search — buscando por cada término (gratis)...',
-  'Google News RSS — complementando cobertura...',
-  'Preparando noticias para análisis...',
-  'Claude analizando sentimiento y contexto...',
+  'Iniciando monitoreo...',
+  'Búsqueda 1 — Menciones CGR (últimos 3 días)...',
+  'Búsqueda 2 — Temas institucionales...',
+  'Búsqueda 3 — Coyuntura actual...',
+  'Analizando sentimiento dual...',
   'Generando resumen ejecutivo...',
   'Finalizando reporte...',
 ];
@@ -1047,30 +1023,29 @@ async function fetchGoogleNews(query) {
   } catch { return []; }
 }
 
-function isRecent(d, h=168) { // 7 días = 168h
+function isRecent(d, h=72) { // 3 días = 72h por defecto
   if (!d) return false;
   try { return new Date(d) >= new Date(Date.now() - h*3600000); }
   catch { return false; }
 }
 
-async function readAllRSS(days=3) {
-  const kws = allKw();
+async function readAllRSS(days=2) {
   const seenUrls = new Set();
   const all = [];
 
-  // ── FUENTE 1: Google Custom Search (búsqueda exacta por cada término) ──
-  // Una búsqueda por cada palabra clave + 3 búsquedas generales CGR
-  const cseQueries = [
-    ...kws,
-    'Contraloría General República Costa Rica',
-    'CGR Costa Rica auditoría',
-    'hacienda pública Costa Rica',
-  ];
+  // ── FUENTE 1: SerpAPI — búsqueda en Google sin CORS ──
+  const serpQueries = [
+    'Contraloría Costa Rica',
+    ...KW.cgr,
+    ...KW.temas.slice(0,2),
+    ...KW.coy.slice(0,2),
+  ].filter(Boolean);
+  const uniqueSerpQueries = [...new Set(serpQueries)];
 
-  const cseResults = await Promise.allSettled(
-    cseQueries.map(q => googleCustomSearch(q, days))
+  const serpResults = await Promise.allSettled(
+    uniqueSerpQueries.map(q => serpSearch(q, days))
   );
-  cseResults.forEach(r => {
+  serpResults.forEach(r => {
     if (r.status !== 'fulfilled') return;
     r.value.forEach(item => {
       if (!seenUrls.has(item.url)) {
@@ -1080,21 +1055,15 @@ async function readAllRSS(days=3) {
     });
   });
 
-  // ── FUENTE 2: Google News RSS (respaldo — cubre lo que CSE pueda perder) ──
-  const rssQueries = [
-    ...kws,
-    'Contraloría General República Costa Rica',
-    'CGR Costa Rica fiscalización',
-  ];
-  const uniqueRssQueries = [...new Set(rssQueries)];
-
+  // ── FUENTE 2: Google News RSS (complemento) ──
+  const rssQueries = ['Contraloría Costa Rica', ...KW.cgr];
   const go = async () => {
     const results = await Promise.allSettled(
-      uniqueRssQueries.map(q => fetchGoogleNews(q))
+      [...new Set(rssQueries)].map(q => fetchGoogleNews(q))
     );
     const rssAll = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
     rssAll.forEach(item => {
-      if (!seenUrls.has(item.url) && isRecent(item.fecha, days*24)) {
+      if (!seenUrls.has(item.url) && (isRecent(item.fecha, days*24) || !item.fecha)) {
         seenUrls.add(item.url);
         all.push({ ...item, fuente_tipo: 'google_news_rss' });
       }
@@ -1102,7 +1071,7 @@ async function readAllRSS(days=3) {
     return all;
   };
 
-  const timeout = new Promise(resolve => setTimeout(() => resolve(all), 14000));
+  const timeout = new Promise(resolve => setTimeout(() => resolve(all), 10000));
   return Promise.race([go(), timeout]).catch(() => all);
 }
 
@@ -1119,7 +1088,16 @@ function setStep(i) {
 // ══════════════════════════════════════════════════
 //  LLAMADA API — helper reutilizable
 // ══════════════════════════════════════════════════
-async function callClaude(apiKey, system, user, maxTokens=5000) {
+async function callClaude(apiKey, system, user, maxTokens=5000, useWebSearch=false) {
+  const body = {
+    model: 'claude-sonnet-4-6',
+    max_tokens: maxTokens,
+    system,
+    messages: [{ role: 'user', content: user }]
+  };
+  if (useWebSearch) {
+    body.tools = [{ type: 'web_search_20250305', name: 'web_search' }];
+  }
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -1128,14 +1106,7 @@ async function callClaude(apiKey, system, user, maxTokens=5000) {
       'anthropic-version': '2023-06-01',
       'anthropic-dangerous-direct-browser-access': 'true'
     },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: maxTokens,
-      system,
-      // Sin herramienta de búsqueda web — Claude solo analiza lo que recibe
-      // El barrido lo hacen Google Custom Search y Google News RSS desde el navegador
-      messages: [{ role: 'user', content: user }]
-    })
+    body: JSON.stringify(body)
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error?.message || `Error HTTP ${res.status}`);
@@ -1163,7 +1134,7 @@ function parseJSON(str) {
 }
 
 // ══════════════════════════════════════════════════
-//  MONITOREO — DOS LLAMADAS
+//  MONITOREO — UNA LLAMADA CON 3 BÚSQUEDAS WEB
 // ══════════════════════════════════════════════════
 async function runMonitor() {
   const apiKey = $('api-key').value.trim();
@@ -1185,134 +1156,127 @@ async function runMonitor() {
   setStep(0);
   await new Promise(r => setTimeout(r, 60));
 
-  const now   = new Date();
-  const today = now.toLocaleDateString('es-CR',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
-  const ago3  = new Date(Date.now()-3*24*3600000).toLocaleDateString('es-CR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  const ayer  = new Date(Date.now()-1*24*3600000).toLocaleDateString('es-CR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const now      = new Date();
+  const today    = now.toLocaleDateString('es-CR',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  const ago3     = new Date(Date.now()-3*24*3600000).toLocaleDateString('es-CR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   const todayISO = now.toISOString().split('T')[0];
   const ago3ISO  = new Date(Date.now()-3*24*3600000).toISOString().split('T')[0];
-  const kws   = allKw();
-  const social  = getSocial();
-  const links   = getLinksText();
-  const manual  = getManualInfo();
+  const kws      = allKw();
+  const social   = getSocial();
+  const links    = getLinksText();
+  const manual   = getManualInfo();
 
-  // PASO 0-1: Google Custom Search + Google News RSS (últimos 3 días)
-  $('topbar-ts').textContent = 'Google Custom Search + Google News RSS (últimos 3 días)...';
-  const rssItems = await readAllRSS(3);
-  setStep(1);
-
-  const cseCount = rssItems.filter(n => n.fuente_tipo === 'google_custom_search').length;
-  const rssCount = rssItems.filter(n => n.fuente_tipo !== 'google_custom_search').length;
-  const totalLabel = rssItems.length > 0
-    ? `${rssItems.length} noticias (CSE:${cseCount} + RSS:${rssCount})`
-    : 'Sin resultados — continuando con búsqueda web';
-  rssB.textContent   = totalLabel;
   rssB.style.display = 'inline-block';
-  rssB.style.background  = rssItems.length > 0 ? '' : 'var(--abg)';
-  rssB.style.color       = rssItems.length > 0 ? '' : 'var(--atx)';
-  rssB.style.borderColor = rssItems.length > 0 ? '' : 'var(--abg)';
+  rssB.textContent   = 'SerpAPI buscando noticias recientes...';
+  rssB.style.background  = 'var(--bbg)';
+  rssB.style.color       = 'var(--btx)';
+  rssB.style.borderColor = 'transparent';
 
-  const rssText = rssItems.length
-    ? rssItems.slice(0,40).map(n=>`[${n.fuente}] ${n.titulo} (${n.fecha}) URL:${n.url} KW:"${n.kwOrigen}"`).join('\n')
-    : 'Sin resultados de Google News.';
+  setStep(1);
+  $('topbar-ts').textContent = 'Buscando con SerpAPI en medios costarricenses...';
 
-  // ── UNA SOLA LLAMADA: ANÁLISIS CON DOBLE SENTIMIENTO ──
-  // El barrido ya lo hicieron Google Custom Search + Google News RSS
-  // Claude solo recibe los resultados y analiza — sin búsquedas web internas
-  setStep(2);
-  $('topbar-ts').textContent = 'Analizando noticias con doble sentimiento...';
+  const ayer2ISO = new Date(Date.now()-2*24*3600000).toISOString().split('T')[0];
 
-  // Usar directamente los resultados del RSS/CSE como noticias recolectadas
-  const noticiasRecolectadas = rssItems.map(n => ({
-    fuente:            n.fuente || '',
-    fecha_publicacion: n.fecha  || '',
-    titulo:            n.titulo || '',
-    url:               n.url    || '',
-    contenido_completo: n.desc  || '',
-    palabra_clave:     n.kwOrigen || '',
-  }));
+  // ── PASO 1: SerpAPI busca noticias desde el navegador (gratis) ──
+  const serpItems = await readAllRSS(2);
+  const serpText = serpItems.length
+    ? `NOTICIAS YA ENCONTRADAS POR SERPAPI (${serpItems.length} resultados — incluilas TODAS en el JSON):\n` +
+      serpItems.map((n,i) => `${i+1}. [${n.fuente}] "${n.titulo}" (${n.fecha}) URL:${n.url} — ${n.desc}`).join('\n')
+    : 'SerpAPI no encontró resultados — hacé el barrido completo con las búsquedas web.';
 
-  // Agregar links manuales
-  if (links) {
-    links.split('\n').filter(l => l.trim()).forEach(l => {
-      noticiasRecolectadas.push({
-        fuente: 'Link manual', fecha_publicacion: todayISO,
-        titulo: l, url: '', contenido_completo: l, palabra_clave: 'manual'
-      });
-    });
-  }
+  rssB.textContent = serpItems.length > 0
+    ? `${serpItems.length} noticias SerpAPI + buscando más...`
+    : 'SerpAPI sin datos — buscando con IA...';
+  rssB.style.background  = serpItems.length > 0 ? 'var(--gbg)' : 'var(--abg)';
+  rssB.style.color       = serpItems.length > 0 ? 'var(--gtx)' : 'var(--atx)';
+  rssB.style.borderColor = serpItems.length > 0 ? '#c0e0c8' : 'var(--abg)';
 
-  rssB.textContent = `${noticiasRecolectadas.length} noticias para analizar`;
-  rssB.style.background  = 'var(--gbg)';
-  rssB.style.color       = 'var(--gtx)';
-  rssB.style.borderColor = '#c0e0c8';
+  const system = `Sos el rastreador y analista de entorno mediático de la Contraloría General de la República de Costa Rica (CGR).
 
-  // Filtrar noticias por fecha antes de pasar a Llamada 2
-  // Solo incluir las que tienen fecha dentro del período O sin fecha (las que Claude encontró)
-  const fechaLimite = new Date(Date.now() - 3*24*3600000);
-  const noticiasValidas = noticiasRecolectadas.filter(n => {
-    if (!n.fecha_publicacion) return true; // sin fecha: dejar pasar, Claude decidirá
-    const f = new Date(n.fecha_publicacion);
-    return isNaN(f.getTime()) || f >= fechaLimite; // fecha inválida o dentro del período
-  });
+OBJETIVO: Encontrar TODAS las noticias publicadas sobre la Contraloría en los últimos 2 días (${ayer2ISO} al ${todayISO}).
 
-  rssB.textContent = `${noticiasValidas.length} noticias encontradas`;
-  rssB.style.background  = 'var(--gbg)';
-  rssB.style.color       = 'var(--gtx)';
-  rssB.style.borderColor = '#c0e0c8';
+INSTRUCCIÓN DE BÚSQUEDA: Ejecutá UNA búsqueda por cada medio de la lista. En todas, "Contraloría" es obligatoria. Recogé TODOS los resultados — no filtrés por relevancia, no omitas ninguna noticia.
 
-  // ── LLAMADA 2: ANÁLISIS CON DOBLE SENTIMIENTO ──
-  setStep(3);
-  $('topbar-ts').textContent = 'Llamada 2/2 — Analizando con doble sentimiento...';
+MEDIOS A RASTREAR (una búsqueda por cada uno):
+1. site:nacion.com "Contraloría" after:${ayer2ISO}
+2. site:crhoy.com "Contraloría" after:${ayer2ISO}
+3. site:teletica.com "Contraloría" after:${ayer2ISO}
+4. site:elfinancierocr.com "Contraloría" after:${ayer2ISO}
+5. site:delfino.cr "Contraloría" after:${ayer2ISO}
+6. site:semanariouniversidad.com "Contraloría" after:${ayer2ISO}
+7. site:larepublica.net "Contraloría" after:${ayer2ISO}
+8. site:ameliarueda.com "Contraloría" after:${ayer2ISO}
+9. site:elmundo.cr "Contraloría" after:${ayer2ISO}
+10. site:elpais.cr "Contraloría" after:${ayer2ISO}
+11. "Contraloría" "Costa Rica" after:${ayer2ISO}
 
-  const noticiasParaAnalizar = noticiasValidas.slice(0,40)
-    .map((n,i)=>`${i+1}.[${n.fuente||''}] "${n.titulo||''}" (${n.fecha_publicacion||'fecha no disponible'}) — ${n.contenido_completo||''} URL:${n.url||''} KW:${n.palabra_clave||''}`)
-    .join('\n');
+REGLA DE FECHA: Solo noticias del ${ayer2ISO} al ${todayISO}. Descartá todo lo anterior.
 
-  const sys2 = `Sos el analista de entorno mediático de la CGR de Costa Rica. Recibís noticias ya recolectadas y debés analizarlas con DOBLE SENTIMIENTO.
+PALABRAS CLAVE para clasificar cada noticia encontrada:
+${allKw().map(k => `• ${k}`).join('\n')}
 
-⚠️ REGLA DE FECHA ESTRICTA: Solo incluí en el JSON noticias cuya fecha sea entre ${ago3} y ${today}. Si una noticia tiene fecha anterior a ${ago7}, DESCARTALA completamente del array "noticias". No la menciones ni la analices.
+DOBLE SENTIMIENTO por cada noticia:
+• sentimiento_noticia: tono del hecho (Positivo/Neutral/Negativo)
+• sentimiento_cgr: impacto para la imagen de la CGR (Favorable/Neutral/Desfavorable)
+Pueden diferir — "CGR detecta irregularidad" = Negativo para el hecho, Favorable para la CGR.
 
-1. sentimiento_noticia: El tono del hecho en sí (¿es positivo, negativo o neutral como noticia?)
-2. sentimiento_cgr: Cómo posiciona esto a la CGR institucionalmente (¿Favorable, Neutral o Desfavorable para la imagen de la Contraloría?)
+NO busques en redes sociales — Twitter/X, Facebook e Instagram bloquean el acceso. El campo redes_sociales solo se completa si se proveen datos manuales, de lo contrario dejalo como array vacío [].
 
-ESTOS PUEDEN SER DISTINTOS — ejemplos:
-• "CGR detecta irregularidades en CONAVI" → sentimiento_noticia:Negativo / sentimiento_cgr:Favorable (la CGR cumple su rol fiscalizador)
-• "Cuestionan demora de CGR en criterio" → sentimiento_noticia:Negativo / sentimiento_cgr:Desfavorable
-• "CGR aprueba presupuesto del BCCR" → sentimiento_noticia:Positivo / sentimiento_cgr:Favorable
-
-En "temas_relevantes" usá siempre strings simples, nunca objetos.
+En temas_relevantes y alertas usá siempre strings simples de texto, NUNCA objetos JSON.
 
 Respondé SOLO con JSON válido:
-{"fecha":"","periodo":"Últimos 3 días (${ago3} al ${today})","resumen_ejecutivo":"3 párrafos\\n\\n","alertas":[],"metricas":{"total_menciones":0,"articulos_prensa":0,"menciones_redes":0,"sentimiento_entorno":"Mixto","posicionamiento_cgr":"Favorable|Neutral|Desfavorable|Mixto","nivel_riesgo":"Bajo|Medio|Alto"},"noticias":[{"fuente":"","fecha_publicacion":"","titulo":"","resumen":"","sentimiento_noticia":"Positivo|Neutral|Negativo","sentimiento_cgr":"Favorable|Neutral|Desfavorable","razon_cgr":"una oración","tema":"","palabra_clave":"","url":""}],"redes_sociales":[{"plataforma":"","autor":"","fecha":"","contenido":"","sentimiento_noticia":"Positivo|Neutral|Negativo","sentimiento_cgr":"Favorable|Neutral|Desfavorable","alcance":"Alto|Medio|Bajo"}],"temas_relevantes":["string","string"],"cobertura_por_medio":{"La Nación":0,"CRHoy":0,"El Financiero":0,"Teletica":0,"Semanario Universidad":0,"Otros":0},"contexto_politico":"2 párrafos"}`;
+{"fecha":"${todayISO}","periodo":"Últimos 2 días (${ayer2ISO} al ${todayISO})","resumen_ejecutivo":"3 párrafos\n\n","alertas":["texto de alerta simple"],"metricas":{"total_menciones":0,"articulos_prensa":0,"menciones_redes":0,"sentimiento_entorno":"Mixto","posicionamiento_cgr":"Favorable|Neutral|Desfavorable|Mixto","nivel_riesgo":"Bajo|Medio|Alto"},"noticias":[{"fuente":"","fecha_publicacion":"YYYY-MM-DD","titulo":"","resumen":"2-3 oraciones","sentimiento_noticia":"Positivo|Neutral|Negativo","sentimiento_cgr":"Favorable|Neutral|Desfavorable","razon_cgr":"una oración","tema":"","palabra_clave":"","url":""}],"redes_sociales":[],"temas_relevantes":["string simple"],"cobertura_por_medio":{"La Nación":0,"CRHoy":0,"El Financiero":0,"Teletica":0,"Semanario Universidad":0,"Otros":0},"contexto_politico":"2 párrafos"}`;
 
-  const user2 = `Analizá estas ${noticiasValidas.length} noticias (${ago3} al ${today}):
+  const userPrompt = `HOY: ${today}. Analizá y completá el monitoreo de Contraloría del ${ayer2ISO} al ${todayISO}.
 
-${noticiasParaAnalizar}
+${serpText}
 
-${social ? `REDES SOCIALES MANUALES (con doble sentimiento):\n${social}` : ''}
+INSTRUCCIÓN PRINCIPAL: Las noticias de SerpAPI de arriba son REALES y verificadas — incluilas TODAS en el JSON sin excepción. Luego ejecutá las búsquedas web para encontrar artículos adicionales que SerpAPI no haya capturado.
 
-${manual ? `INFORMACIÓN MAPEADA POR EL EQUIPO DFOE (alta prioridad — es información verificada internamente, incorporala al análisis y al resumen ejecutivo):\n${manual}` : ''}
+BÚSQUEDAS WEB ADICIONALES (para complementar SerpAPI):
+- Ejecutá las 11 búsquedas del sistema
+- Agregá solo los artículos NUEVOS que no estén ya en la lista de SerpAPI
+- Una entrada por cada artículo — nunca agrupes
 
-Para cada noticia asigná sentimiento_noticia Y sentimiento_cgr por separado. En el resumen ejecutivo destacá los casos donde difieren y cualquier información mapeada manualmente.
+${links ? `LINKS MANUALES (incluilos siempre):\n${links}` : ''}
+${manual ? `INFORMACIÓN MAPEADA POR DFOE (alta prioridad):\n${manual}` : ''}
+${social ? `REDES SOCIALES MANUALES:\n${social}` : ''}
 
-Generá el JSON completo.`;
+El array "noticias" debe tener UNA entrada por cada artículo — los de SerpAPI más los nuevos de las búsquedas web.`;
 
-  const timers = [3000,6000,10000].map((t,i) => setTimeout(()=>setStep(i+3), t));
+  setStep(2);
+  const timers = [5000,10000,15000].map((t,i) => setTimeout(()=>setStep(i+3), t));
 
   try {
-    const raw2 = await callClaude(apiKey, sys2, user2, 6000);
+    const raw = await callClaude(apiKey, system, userPrompt, 8000, true);
     timers.forEach(clearTimeout);
-    setStep(6);
+    setStep(5);
 
-    const report = parseJSON(raw2);
-    if (!report || typeof report !== 'object') throw new Error('Análisis devolvió respuesta inválida. Intentá de nuevo.');
+    const report = parseJSON(raw);
+    if (!report || typeof report !== 'object') throw new Error('Respuesta inválida. Intentá de nuevo.');
+
+    // Filtrar noticias viejas del resultado
+    const fechaLimite = new Date(ago3ISO);
+    if (report.noticias) {
+      report.noticias = report.noticias.filter(n => {
+        if (!n.fecha_publicacion) return true;
+        const f = new Date(n.fecha_publicacion);
+        return isNaN(f.getTime()) || f >= fechaLimite;
+      });
+    }
 
     lastReport = report;
     renderResults(report);
+
+    const total = report.noticias?.length || 0;
+    rssB.textContent = `${total} noticias encontradas`;
+    rssB.style.background  = total > 0 ? 'var(--gbg)' : 'var(--abg)';
+    rssB.style.color       = total > 0 ? 'var(--gtx)' : 'var(--atx)';
+    rssB.style.borderColor = total > 0 ? '#c0e0c8'    : 'var(--abg)';
+
     badge.textContent = 'COMPLETADO'; badge.className = 'status-badge done';
     const ts = new Date().toLocaleString('es-CR',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short'});
-    $('topbar-ts').textContent = `Actualizado: ${ts} · Últimos 3 días · ${noticiasValidas.length} noticias analizadas`;
+    $('topbar-ts').textContent = `Actualizado: ${ts} · Últimos 3 días · ${total} noticias`;
 
   } catch(e) {
     timers.forEach(clearTimeout);
@@ -1346,7 +1310,7 @@ function renderResults(r) {
   const SB = {Positivo:'#e6f4ea',Negativo:'#fbeaea',Neutral:'#fdf3e0',Mixto:'#e8f1fb'};
 
   const alertsH = (r.alertas||[]).length
-    ? `<div class="g1"><div class="card"><div class="card-head"><span class="card-title">⚠ Alertas del período</span></div><div style="padding:0">${(r.alertas||[]).map(a=>`<div class="alert-item"><div class="alert-dot"></div><div class="alert-text">${a}</div></div>`).join('')}</div></div></div>`
+    ? `<div class="g1"><div class="card"><div class="card-head"><span class="card-title">⚠ Alertas del período</span></div><div style="padding:0">${(r.alertas||[]).map(a=>`<div class="alert-item"><div class="alert-dot"></div><div class="alert-text">${typeof a === 'string' ? a : (a.texto || a.alerta || a.descripcion || JSON.stringify(a))}</div></div>`).join('')}</div></div></div>`
     : '';
 
   // Agrupar noticias por palabra clave para mostrar al menos una por tema
@@ -1496,7 +1460,7 @@ function exportHTML() {
   const notH = (r.noticias||[]).map(n=>`<div style="padding:10px 0;border-bottom:1px solid #ddd9d2"><div style="font-size:9px;color:#9e9a94;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px">${n.fuente||''} ${n.fecha_publicacion?'· '+n.fecha_publicacion:''}</div><div style="font-size:13px;font-weight:500;color:#1a1917;margin-bottom:4px">${n.titulo||''}</div><div style="font-size:11px;color:#5c5954;margin-bottom:5px">${n.resumen||''}</div><div style="display:flex;align-items:center;gap:6px">${bsq(n.sentimiento,SC,SB)}${n.tema?`<span style="font-size:10px;color:#9e9a94">${n.tema}</span>`:''}${n.url?`<a href="${n.url}" style="font-size:10px;color:#384A99;margin-left:auto" target="_blank">Ver →</a>`:''}</div></div>`).join('');
   const resH = (r.resumen_ejecutivo||'').split('\n\n').filter(p=>p.trim()).map(p=>`<p style="margin-bottom:10px;line-height:1.75">${p}</p>`).join('');
   const ctxH = (r.contexto_politico||'').split('\n\n').filter(p=>p.trim()).map(p=>`<p style="margin-bottom:10px;line-height:1.75">${p}</p>`).join('');
-  const altH = (r.alertas||[]).map(a=>`<div style="display:flex;gap:8px;padding:9px 12px;border-left:3px solid #E57B3C;background:#fdf3e0;margin-bottom:5px"><div style="width:6px;height:6px;border-radius:50%;background:#E57B3C;margin-top:5px;flex-shrink:0"></div><div style="font-size:13px;color:#7a4e0a;line-height:1.5">${a}</div></div>`).join('');
+  const altH = (r.alertas||[]).map(a=>`<div style="display:flex;gap:8px;padding:9px 12px;border-left:3px solid #E57B3C;background:#fdf3e0;margin-bottom:5px"><div style="width:6px;height:6px;border-radius:50%;background:#E57B3C;margin-top:5px;flex-shrink:0"></div><div style="font-size:13px;color:#7a4e0a;line-height:1.5">${typeof a === 'string' ? a : (a.texto || a.alerta || a.descripcion || JSON.stringify(a))}</div></div>`).join('');
   const temH = (r.temas_relevantes||[])
     .map(t => typeof t === 'string' ? t : (t.tema || t.nombre || JSON.stringify(t)))
     .filter(Boolean)
